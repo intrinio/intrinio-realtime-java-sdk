@@ -12,18 +12,6 @@
 * Subscribe to updates from individual securities
 * Subscribe to updates for all securities (contact us for special access)
 
-## Installation
-Include in your Maven pom.xml file:
-```
-<dependencies>
-    <dependency>
-        <groupId>com.intrinio.realtime</groupId>
-        <artifactId>intrinio-realtime</artifactId>
-        <version>1.0.0</version>
-    </dependency>
-</dependencies>
-```
-
 ## Example Usage
 ```java
 String username = "YOUR_INTRINIO_API_USERNAME";

@@ -177,6 +177,7 @@ client.join("AAPL");
 ---------
 
 `client.join(String[] channels)` - Joins the given channels.
+* **Parameter** `channels` - The channels to join
 
 ```java
 client.join(new String[]{"AAPL", "MSFT"});
@@ -194,6 +195,7 @@ client.leave("AAPL");
 ---------
 
 `client.leave(String[] channels)` - Leaves the given channels.
+* **Parameter** `channel` - The channels to leave
 
 ```java
 client.leave(new String[]{"AAPL", "MSFT"});
@@ -206,6 +208,7 @@ client.leave(new String[]{"AAPL", "MSFT"});
 ---------
 
 `client.setChannels(String[] channels)` - Joins/leaves channels so that only the given channels are joined.
+* **Parameter** `channels` - The only channels to join
 
 ```java
 client.setChannels(new String[]{"AAPL", "MSFT"});
@@ -214,6 +217,7 @@ client.setChannels(new String[]{"AAPL", "MSFT"});
 ---------
 
 `client.setLogger(Logger logger)` - Replaces the internal logger with the provided java.util.logging.Logger instance.
+* **Parameter** `logger` - A java.util.logging.Logger instance
 
 ---------
 

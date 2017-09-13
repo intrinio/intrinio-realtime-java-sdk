@@ -25,3 +25,4 @@ hs_err_pid*
 IntrinioRealTime.iml
 target/
 src/main/java/com/intrinio/realtime/Test.java
+settings.xml

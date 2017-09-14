@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static java.lang.Thread.sleep;
@@ -24,7 +25,7 @@ public class RealTimeClient implements AutoCloseable {
 
     private String username;
     private String password;
-    private String provider;
+    private Provider provider;
     private Logger logger;
     private Boolean ready;
     private ArrayBlockingQueue<Quote> queue;
@@ -32,24 +33,32 @@ public class RealTimeClient implements AutoCloseable {
     private Set<String> joinedChannels;
     private String token;
     private WebSocket ws;
-    private boolean debug;
     private long lastQueueWarningTime = 0;
     private List<Thread> threadsRunning = new ArrayList<Thread>();
 
-    public static final String PROVIDER_IEX = "iex";
     private static final Integer MAX_QUEUE_SIZE = 10000;
     private static final Integer HEARTBEAT_INTERVAL = 20000;
     private static final Integer SELF_HEAL_TIME = 1000;
     private static final String IEX_HEARTBEAT_MSG = "{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}";
 
-    public RealTimeClient(String username, String password, String provider) {
+    public enum Provider { IEX }
+
+    public RealTimeClient(String username, String password, Provider provider) {
         this(username, password, provider, MAX_QUEUE_SIZE);
     }
 
-    public RealTimeClient(String username, String password, String provider, Integer maxQueueSize) {
+    public RealTimeClient(String username, String password, Provider provider, Integer maxQueueSize) {
         this.username = username;
         this.password = password;
         this.provider = provider;
+
+        if (this.username == null || this.username.isEmpty()) {
+            throw new IllegalArgumentException("Username is required");
+        }
+
+        if (this.password == null || this.password.isEmpty()) {
+            throw new IllegalArgumentException("Password is required");
+        }
 
         this.logger = Logger.getLogger(RealTimeClient.class.getName());
         this.ready = false;
@@ -65,7 +74,7 @@ public class RealTimeClient implements AutoCloseable {
                 try {
                     while (true) {
                         sleep(HEARTBEAT_INTERVAL);
-                        if (client.provider.equals(PROVIDER_IEX)) {
+                        if (client.provider.equals(Provider.IEX)) {
                             if (client.ws != null) {
                                 client.ws.sendText(IEX_HEARTBEAT_MSG);
                             }
@@ -100,10 +109,7 @@ public class RealTimeClient implements AutoCloseable {
             this.refreshWebSocket();
         }
         catch (Exception e) {
-            this.logger.severe("Cannot connect: " + e.getMessage());
-            if (this.debug) {
-                e.printStackTrace();
-            }
+            this.logger.log(Level.SEVERE, "Cannot connect", e);
             this.trySelfHeal();
         }
     }
@@ -136,10 +142,16 @@ public class RealTimeClient implements AutoCloseable {
         return this.queue.take();
     }
 
-    public void registerQuoteHandler(QuoteHandler handler) {
-        handler.setClient(this);
-        handler.start();
-        this.threadsRunning.add(handler);
+    public void registerQuoteHandler(final QuoteHandler run) {
+        QuoteHandlerThread thread = new QuoteHandlerThread() {
+            @Override
+            public void onQuote(Quote quote) {
+                run.onQuote(quote);
+            }
+        };
+        thread.setClient(this);
+        thread.start();
+        this.threadsRunning.add(thread);
     }
 
     public int remainingQueueCapacity() {
@@ -193,12 +205,8 @@ public class RealTimeClient implements AutoCloseable {
         this.logger = logger;
     }
 
-    public void setDebug(boolean debug) {
-        this.debug = debug;
-    }
-
     private String makeAuthUrl() {
-        if (this.provider.equals(PROVIDER_IEX)) {
+        if (this.provider.equals(Provider.IEX)) {
             return "https://realtime.intrinio.com/auth";
         }
         return null;
@@ -236,7 +244,7 @@ public class RealTimeClient implements AutoCloseable {
     }
 
     private String makeWebSocketUrl() throws URISyntaxException {
-        if (this.provider.equals(PROVIDER_IEX)) {
+        if (this.provider.equals(Provider.IEX)) {
             return "wss://realtime.intrinio.com/socket/websocket?vsn=1.0.0&token=" + this.token;
         }
         return null;
@@ -250,7 +258,7 @@ public class RealTimeClient implements AutoCloseable {
         this.ws = new WebSocketFactory().createSocket(webSocketUrl);
         this.ws.addListener(new WebSocketAdapter() {
             @Override
-            public void onConnected(WebSocket websocket, Map<String, List<String>> headers) {
+            public void onConnected(WebSocket websocket, Map<String, List<String>> headers) throws Exception {
                 client.logger.info("Websocket opened!");
                 client.afterConnect();
             }
@@ -264,8 +272,13 @@ public class RealTimeClient implements AutoCloseable {
             }
 
             @Override
-            public void onError(WebSocket websocket, WebSocketException cause) {
-                client.logger.severe("Websocket error: " + cause.getMessage());
+            public void onError(WebSocket websocket, WebSocketException e) {
+                client.logger.log(Level.SEVERE, "Websocket error", e);
+            }
+
+            @Override
+            public void handleCallbackError(WebSocket websocket, Throwable e) throws Exception {
+                client.logger.log(Level.SEVERE, "Websocket error", e);
             }
 
             @Override
@@ -275,7 +288,7 @@ public class RealTimeClient implements AutoCloseable {
                 JSONObject json = new JSONObject(message);
                 Quote quote = null;
 
-                if (client.provider.equals(PROVIDER_IEX)) {
+                if (client.provider.equals(Provider.IEX)) {
                     if (json.getString("event").equals("quote")) {
                         JSONObject payload = json.getJSONObject("payload");
                         quote = new IexQuote(payload);
@@ -299,7 +312,6 @@ public class RealTimeClient implements AutoCloseable {
         this.ready = true;
         this.refreshChannels();
     }
-
 
     private void trySelfHeal() throws Exception {
         sleep(SELF_HEAL_TIME);
@@ -335,11 +347,10 @@ public class RealTimeClient implements AutoCloseable {
         this.logger.fine("Current channels: " + this.joinedChannels);
     }
 
-
     private String makeJoinMessage(String channel) {
         String message = "";
 
-        if (this.provider.equals(PROVIDER_IEX)) {
+        if (this.provider.equals(Provider.IEX)) {
             message = "{\"topic\":\"" + this.parseIexTopic(channel) + "\",\"event\":\"phx_join\",\"payload\":{},\"ref\":null}";
         }
 
@@ -349,7 +360,7 @@ public class RealTimeClient implements AutoCloseable {
     private String makeLeaveMessage(String channel) {
         String message = "";
 
-        if (this.provider.equals(PROVIDER_IEX)) {
+        if (this.provider.equals(Provider.IEX)) {
             message = "{\"topic\":\"" + this.parseIexTopic(channel) + "\",\"event\":\"phx_leave\",\"payload\":{},\"ref\":null}";
         }
 

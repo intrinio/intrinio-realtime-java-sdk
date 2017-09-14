@@ -24,5 +24,7 @@ hs_err_pid*
 .idea/
 IntrinioRealTime.iml
 target/
-src/main/java/com/intrinio/realtime/Test.java
+Test.java
 settings.xml
+out
+.DS_Store

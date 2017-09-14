@@ -16,11 +16,9 @@
 ```java
 String username = "YOUR_INTRINIO_API_USERNAME";
 String password = "YOUR_INTRINIO_API_PASSWORD";
-String provider = RealTimeClient.PROVIDER_IEX;
 
-try (RealTimeClient client = new RealTimeClient(username, password, provider)) {
+try (RealTimeClient client = new RealTimeClient(username, password, RealtimeClient.Provider.IEX)) {
     client.registerQuoteHandler(new QuoteHandler() {
-        @Override
         public void onQuote(Quote quote) {
             System.out.println(quote.toString());
         }
@@ -86,34 +84,32 @@ You will receive your Intrinio API Username and Password after [creating an acco
 
 ### Methods
 
-`RealTimeClient client = new RealTimeClient(String username, String password, String provider)` - Creates an Intrinio Real-Time client
+`RealTimeClient client = new RealTimeClient(String username, String password, RealTimeClient.Provider provider)` - Creates an Intrinio Real-Time client
 * **Parameter** `username`: Your Intrinio API Username
 * **Parameter** `password`: Your Intrinio API Password
-* **Parameter** `provider`: The real-time data provider to use (for now "iex" only)
+* **Parameter** `provider`: The real-time data provider to use
 
 ```java
 String username = "YOUR_INTRINIO_API_USERNAME";
 String password = "YOUR_INTRINIO_API_PASSWORD";
-String provider = RealTimeClient.PROVIDER_IEX;
 
-RealTimeClient client = new RealTimeClient(username, password, provider);
+RealTimeClient client = new RealTimeClient(username, password, RealTimeClient.Provider.IEX);
 ```
 
 ---------
 
-`RealTimeClient client = new RealTimeClient(String username, String password, String provider, Integer maxQueueSize)` - Creates an Intrinio Real-Time client
+`RealTimeClient client = new RealTimeClient(String username, String password, RealTimeClient.Provider provider, Integer maxQueueSize)` - Creates an Intrinio Real-Time client
 * **Parameter** `username`: Your Intrinio API Username
 * **Parameter** `password`: Your Intrinio API Password
-* **Parameter** `provider`: The real-time data provider to use (for now "iex" only)
+* **Parameter** `provider`: The real-time data provider to use
 * **Parameter** `maxQueueSize`: The maximum size of the quote queue (default size is 10,000)
 
 ```java
 String username = "YOUR_INTRINIO_API_USERNAME";
 String password = "YOUR_INTRINIO_API_PASSWORD";
-String provider = RealTimeClient.PROVIDER_IEX;
 Integer maxQueueSize = 50000;
 
-RealTimeClient client = new RealTimeClient(username, password, provider, maxQueueSize);
+RealTimeClient client = new RealTimeClient(username, password, RealTimeClient.Provider.IEX, maxQueueSize);
 ```
 
 ---------
@@ -138,11 +134,18 @@ RealTimeClient client = new RealTimeClient(username, password, provider, maxQueu
 
 ```java
 client.registerQuoteHandler(new QuoteHandler() {
-    @Override
     public void onQuote(Quote quote) {
         // do something with the quote
     }
 });
+```
+
+Or with Java 8 lambdas:
+
+```java
+client.registerQuoteHandler(quote ->
+    // do something with quote
+);
 ```
 
 ---------
@@ -206,7 +209,3 @@ client.setChannels(new String[]{"AAPL", "MSFT"});
 
 `client.setLogger(Logger logger)` - Replaces the internal logger with the provided java.util.logging.Logger instance.
 * **Parameter** `logger` - A java.util.logging.Logger instance
-
----------
-
-`client.setDebug(boolean debug)` - Turns debug mode on/off. Debug mode will print exception stack traces.

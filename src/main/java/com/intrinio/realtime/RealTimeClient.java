@@ -287,7 +287,9 @@ public class RealTimeClient implements AutoCloseable {
 
             @Override
             public void onError(WebSocket websocket, WebSocketException e) {
-                client.logger.log(Level.SEVERE, "Websocket error", e);
+                if (!e.getError().equals(WebSocketError.STATUS_LINE_BAD_FORMAT)) {
+                    client.logger.log(Level.SEVERE, "Websocket error", e);
+                }
             }
 
             @Override

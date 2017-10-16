@@ -44,6 +44,7 @@ public class IexQuote implements Quote {
                 ", ticker: " + this.ticker +
                 ", price: " + this.price +
                 ", size: " + this.size +
-                ", timestamp: " + this.timestamp;
+                ", timestamp: " + this.timestamp +
+                ")";
     }
 }

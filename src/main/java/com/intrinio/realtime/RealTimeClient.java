@@ -37,11 +37,10 @@ public class RealTimeClient implements AutoCloseable {
     private List<Thread> threadsRunning = new ArrayList<Thread>();
 
     private static final Integer MAX_QUEUE_SIZE = 10000;
-    private static final Integer HEARTBEAT_INTERVAL = 20000;
+    private static final Integer HEARTBEAT_INTERVAL = 3000;
     private static final Integer SELF_HEAL_TIME = 1000;
-    private static final String IEX_HEARTBEAT_MSG = "{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}";
 
-    public enum Provider { IEX }
+    public enum Provider { IEX, QUODD }
 
     public RealTimeClient(String username, String password, Provider provider) {
         this(username, password, provider, MAX_QUEUE_SIZE);
@@ -74,10 +73,17 @@ public class RealTimeClient implements AutoCloseable {
                 try {
                     while (true) {
                         sleep(HEARTBEAT_INTERVAL);
+
+                        String msg = null;
                         if (client.provider.equals(Provider.IEX)) {
-                            if (client.ws != null) {
-                                client.ws.sendText(IEX_HEARTBEAT_MSG);
-                            }
+                            msg = "{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}";
+                        }
+                        else if (client.provider.equals(Provider.QUODD)) {
+                            msg = "{\"event\": \"heartbeat\", \"data\": {\"action\": \"heartbeat\", \"ticker\": " + System.currentTimeMillis() + "}}";
+                        }
+
+                        if (msg != null && client.ws != null) {
+                            client.ws.sendText(msg);
                         }
                     }
                 }
@@ -209,6 +215,9 @@ public class RealTimeClient implements AutoCloseable {
         if (this.provider.equals(Provider.IEX)) {
             return "https://realtime.intrinio.com/auth";
         }
+        else if (this.provider.equals(Provider.QUODD)) {
+            return "https://api.intrinio.com/token?type=QUODD";
+        }
         return null;
     }
 
@@ -247,6 +256,9 @@ public class RealTimeClient implements AutoCloseable {
         if (this.provider.equals(Provider.IEX)) {
             return "wss://realtime.intrinio.com/socket/websocket?vsn=1.0.0&token=" + this.token;
         }
+        else if (this.provider.equals(Provider.QUODD)) {
+            return "ws://www6.quodd.com/WebStreamer/webStreamer/intrinio/" + this.token;
+        }
         return null;
     }
 
@@ -260,7 +272,9 @@ public class RealTimeClient implements AutoCloseable {
             @Override
             public void onConnected(WebSocket websocket, Map<String, List<String>> headers) throws Exception {
                 client.logger.info("Websocket opened!");
-                client.afterConnect();
+                if (client.provider.equals(Provider.IEX)) {
+                    client.afterConnect();
+                }
             }
 
             @Override
@@ -273,7 +287,9 @@ public class RealTimeClient implements AutoCloseable {
 
             @Override
             public void onError(WebSocket websocket, WebSocketException e) {
-                client.logger.log(Level.SEVERE, "Websocket error", e);
+                if (!e.getError().equals(WebSocketError.STATUS_LINE_BAD_FORMAT)) {
+                    client.logger.log(Level.SEVERE, "Websocket error", e);
+                }
             }
 
             @Override
@@ -292,6 +308,19 @@ public class RealTimeClient implements AutoCloseable {
                     if (json.getString("event").equals("quote")) {
                         JSONObject payload = json.getJSONObject("payload");
                         quote = new IexQuote(payload);
+                    }
+                }
+                else if (client.provider.equals(Provider.QUODD)) {
+                    if (json.getString("event").equals("info") && json.getJSONObject("data").getString("message").equals("Connected")) {
+                        client.afterConnect();
+                    }
+                    else if (json.getString("event").equals("quote")) {
+                        JSONObject payload = json.getJSONObject("data");
+                        quote = new QuoddBookQuote(payload);
+                    }
+                    else if (json.getString("event").equals("trade")) {
+                        JSONObject payload = json.getJSONObject("data");
+                        quote = new QuoddTradeQuote(payload);
                     }
                 }
 
@@ -353,6 +382,9 @@ public class RealTimeClient implements AutoCloseable {
         if (this.provider.equals(Provider.IEX)) {
             message = "{\"topic\":\"" + this.parseIexTopic(channel) + "\",\"event\":\"phx_join\",\"payload\":{},\"ref\":null}";
         }
+        else if (this.provider.equals(Provider.QUODD)) {
+            message = "{\"event\": \"subscribe\", \"data\": { \"ticker\": " + channel + ", \"action\": \"subscribe\"}}";
+        }
 
         return message;
     }
@@ -362,6 +394,9 @@ public class RealTimeClient implements AutoCloseable {
 
         if (this.provider.equals(Provider.IEX)) {
             message = "{\"topic\":\"" + this.parseIexTopic(channel) + "\",\"event\":\"phx_leave\",\"payload\":{},\"ref\":null}";
+        }
+        else if (this.provider.equals(Provider.QUODD)) {
+            message = "{\"event\": \"unsubscribe\", \"data\": { \"ticker\": " + channel + ", \"action\": \"unsubscribe\"}}";
         }
 
         return message;

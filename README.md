@@ -169,6 +169,11 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
 
 ## Channels
 
+### QUODD
+
+To receive price quotes from QUODD, you need to instruct the client to "join" a channel. A channel can be
+* A security ticker with data feed designation (`AAPL.NB`, `MSFT.NB`, `GE.NB`, etc)
+
 ### IEX
 
 To receive price quotes from IEX, you need to instruct the client to "join" a channel. A channel can be

@@ -257,7 +257,7 @@ public class RealTimeClient implements AutoCloseable {
             return "wss://realtime.intrinio.com/socket/websocket?vsn=1.0.0&token=" + this.token;
         }
         else if (this.provider.equals(Provider.QUODD)) {
-            return "ws://www6.quodd.com/WebStreamer/webStreamer/intrinio/" + this.token;
+            return "wss://www5.quodd.com/websocket/webStreamer/intrinio/" + this.token;
         }
         return null;
     }

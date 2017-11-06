@@ -2,30 +2,28 @@ package com.intrinio.realtime;
 
 import org.json.JSONObject;
 
-import java.math.BigDecimal;
-
 public class QuoddBookQuote implements Quote {
-    private BigDecimal askSize = null;
-    private BigDecimal quoteTime = null;
-    private BigDecimal rtl = null;
+    private Double askSize = null;
+    private Double quoteTime = null;
+    private Double rtl = null;
     private String ticker = null;
     private String askExchange = null;
-    private BigDecimal askPrice4d = null;
+    private Double askPrice4d = null;
     private String bidExchange = null;
-    private BigDecimal bidPrice4d = null;
-    private BigDecimal bidSize = null;
+    private Double bidPrice4d = null;
+    private Double bidSize = null;
     private Integer protocolId = null;
     private String rootTicker = null;
 
     public QuoddBookQuote(JSONObject message) {
         if (message.has("ask_size")) {
-            this.askSize = message.getBigDecimal("ask_size");
+            this.askSize = message.getDouble("ask_size");
         }
         if (message.has("quote_time")) {
-            this.quoteTime = message.getBigDecimal("quote_time");
+            this.quoteTime = message.getDouble("quote_time");
         }
         if (message.has("rtl")) {
-            this.rtl = message.getBigDecimal("rtl");
+            this.rtl = message.getDouble("rtl");
         }
         if (message.has("ticker")) {
             this.ticker = message.getString("ticker");
@@ -34,16 +32,16 @@ public class QuoddBookQuote implements Quote {
             this.askExchange = message.getString("ask_exchange");
         }
         if (message.has("ask_price_4d")) {
-            this.askPrice4d = message.getBigDecimal("ask_price_4d");
+            this.askPrice4d = message.getDouble("ask_price_4d");
         }
         if (message.has("bid_exchange")) {
             this.bidExchange = message.getString("bid_exchange");
         }
         if (message.has("bid_price_4d")) {
-            this.bidPrice4d = message.getBigDecimal("bid_price_4d");
+            this.bidPrice4d = message.getDouble("bid_price_4d");
         }
         if (message.has("bid_size")) {
-            this.bidSize = message.getBigDecimal("bid_size");
+            this.bidSize = message.getDouble("bid_size");
         }
         if (message.has("protocol_id")) {
             this.protocolId = message.getInt("protocol_id");
@@ -53,15 +51,15 @@ public class QuoddBookQuote implements Quote {
         }
     }
 
-    public BigDecimal getAskSize() {
+    public Double getAskSize() {
         return askSize;
     }
 
-    public BigDecimal getQuoteTime() {
+    public Double getQuoteTime() {
         return quoteTime;
     }
 
-    public BigDecimal getRtl() {
+    public Double getRtl() {
         return rtl;
     }
 
@@ -73,7 +71,7 @@ public class QuoddBookQuote implements Quote {
         return askExchange;
     }
 
-    public BigDecimal getAskPrice4d() {
+    public Double getAskPrice4d() {
         return askPrice4d;
     }
 
@@ -81,11 +79,11 @@ public class QuoddBookQuote implements Quote {
         return bidExchange;
     }
 
-    public BigDecimal getBidPrice4d() {
+    public Double getBidPrice4d() {
         return bidPrice4d;
     }
 
-    public BigDecimal getBidSize() {
+    public Double getBidSize() {
         return bidSize;
     }
 

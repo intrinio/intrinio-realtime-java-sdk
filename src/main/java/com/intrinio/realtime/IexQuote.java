@@ -6,16 +6,16 @@ import java.math.BigDecimal;
 public class IexQuote implements Quote {
     private String type;
     private String ticker;
-    private BigDecimal price;
+    private Double price;
     private long size;
-    private BigDecimal timestamp;
+    private Double timestamp;
 
     public IexQuote(JSONObject message) {
         this.type = message.getString("type");
         this.ticker = message.getString("ticker");
-        this.price = message.getBigDecimal("price");
+        this.price = message.getDouble("price");
         this.size = message.getLong("size");
-        this.timestamp = message.getBigDecimal("timestamp");
+        this.timestamp = message.getDouble("timestamp");
     }
 
     public String getType() {
@@ -26,7 +26,7 @@ public class IexQuote implements Quote {
         return ticker;
     }
 
-    public BigDecimal getPrice() {
+    public Double getPrice() {
         return price;
     }
 
@@ -34,7 +34,7 @@ public class IexQuote implements Quote {
         return size;
     }
 
-    public BigDecimal getTimestamp() {
+    public Double getTimestamp() {
         return timestamp;
     }
 

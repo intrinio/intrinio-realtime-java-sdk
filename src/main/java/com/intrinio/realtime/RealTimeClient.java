@@ -1,15 +1,7 @@
 package com.intrinio.realtime;
 
 import com.neovisionaries.ws.client.*;
-import org.apache.commons.codec.binary.Base64;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.ResponseHandler;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
+import okhttp3.*;
 import org.json.JSONObject;
 
 import java.io.IOException;
@@ -222,34 +214,30 @@ public class RealTimeClient implements AutoCloseable {
     }
 
     private void refreshToken() throws IOException {
-        CloseableHttpClient httpClient = HttpClients.createDefault();
+        ConnectionSpec spec = new ConnectionSpec.Builder(ConnectionSpec.COMPATIBLE_TLS)
+                .build();
 
-        try {
-            String authUrl = this.makeAuthUrl();
+        OkHttpClient client = new OkHttpClient.Builder()
+                .connectionSpecs(Collections.singletonList(spec))
+                .build();
 
-            HttpGet httpGet = new HttpGet(authUrl);
-            String encodedAuth = new String(Base64.encodeBase64((this.username + ":" + this.password).getBytes()));
-            httpGet.setHeader("Authorization", "Basic " + encodedAuth);
+        String authUrl = this.makeAuthUrl();
 
-            ResponseHandler<String> responseHandler = new ResponseHandler<String>() {
-                @Override
-                public String handleResponse(final HttpResponse response) throws IOException {
-                    int status = response.getStatusLine().getStatusCode();
-                    if (status == 200) {
-                        HttpEntity entity = response.getEntity();
-                        return entity != null ? EntityUtils.toString(entity) : null;
-                    } else {
-                        throw new ClientProtocolException("Unexpected response status: " + status);
-                    }
-                }
-            };
+        String credential = Credentials.basic(this.username, this.password);
 
-            this.token = httpClient.execute(httpGet, responseHandler);
+        Request request = new Request.Builder()
+                .url(authUrl)
+                .header("Authorization", credential)
+                .build();
+
+        Response response = client.newCall(request).execute();
+        if (response.isSuccessful()) {
+            this.token = response.body().string();
             this.logger.info("Authentication successful!");
-        } finally {
-            httpClient.close();
         }
-
+        else {
+            throw new RuntimeException("Unexpected response status: " + response.code());
+        }
     }
 
     private String makeWebSocketUrl() throws URISyntaxException {

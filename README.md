@@ -10,6 +10,10 @@
 
 Go to [Release](https://github.com/intrinio/intrinio-realtime-java-sdk/releases), download the JAR, reference it in your project. The JAR contains dependencies necessary to the SDK.
 
+## Sample Project
+
+For a sample project see: [intrinio-realtime-java-sample](https://github.com/intrinio/intrinio-realtime-java-sample)
+
 ## Features
 
 * Receive streaming, real-time price quotes (last trade, bid, ask)

@@ -12,7 +12,9 @@ Go to [Release](https://github.com/intrinio/intrinio-realtime-java-sdk/releases)
 
 ## Sample Project
 
-For a sample project see: [intrinio-realtime-java-sample](https://github.com/intrinio/intrinio-realtime-java-sample)
+For a sample Java project see: [intrinio-realtime-java-sample](https://github.com/intrinio/intrinio-realtime-java-sample)
+
+For a sample Android project see: [intrinio-realtime-android-sample](https://github.com/intrinio/intrinio-realtime-android-sample)
 
 ## Features
 

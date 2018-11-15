@@ -17,6 +17,7 @@ public class RealTimeClient implements AutoCloseable {
 
     private String username;
     private String password;
+    private String api_key;
     private Provider provider;
     private Logger logger;
     private Boolean ready;
@@ -34,6 +35,56 @@ public class RealTimeClient implements AutoCloseable {
 
     public enum Provider { IEX, QUODD }
 
+    // API KEY AUTH
+    public RealTimeClient(String api_key, Provider provider) {
+        this(api_key, provider, MAX_QUEUE_SIZE);
+    }
+
+    public RealTimeClient(String api_key, Provider provider, Integer maxQueueSize) {
+        this.api_key = api_key;
+        this.provider = provider;
+
+        if (this.api_key == null || this.api_key.isEmpty()) {
+            throw new IllegalArgumentException("API Key is required");
+        }
+
+        this.logger = Logger.getLogger(RealTimeClient.class.getName());
+        this.ready = false;
+        this.queue = new ArrayBlockingQueue<Quote>(maxQueueSize);
+        this.channels = new HashSet<String>();
+        this.joinedChannels = new HashSet<String>();
+
+        // Setup heartbeat
+        final RealTimeClient client = this;
+        Thread heartbeat = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    while (true) {
+                        sleep(HEARTBEAT_INTERVAL);
+
+                        String msg = null;
+                        if (client.provider.equals(Provider.IEX)) {
+                            msg = "{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}";
+                        }
+                        else if (client.provider.equals(Provider.QUODD)) {
+                            msg = "{\"event\": \"heartbeat\", \"data\": {\"action\": \"heartbeat\", \"ticker\": " + System.currentTimeMillis() + "}}";
+                        }
+
+                        if (msg != null && client.ws != null) {
+                            client.ws.sendText(msg);
+                        }
+                    }
+                }
+                catch (InterruptedException e) { }
+            }
+        };
+
+        heartbeat.start();
+        this.threadsRunning.add(heartbeat);
+    }
+
+    // BASIC AUTH
     public RealTimeClient(String username, String password, Provider provider) {
         this(username, password, provider, MAX_QUEUE_SIZE);
     }
@@ -204,13 +255,28 @@ public class RealTimeClient implements AutoCloseable {
     }
 
     private String makeAuthUrl() {
+        String auth_url = null;
         if (this.provider.equals(Provider.IEX)) {
-            return "https://realtime.intrinio.com/auth";
+            auth_url = "https://realtime.intrinio.com/auth";
         }
         else if (this.provider.equals(Provider.QUODD)) {
-            return "https://api.intrinio.com/token?type=QUODD";
+            auth_url = "https://api.intrinio.com/token?type=QUODD";
         }
-        return null;
+        if (this.api_key != null && !this.api_key.isEmpty()) {
+            auth_url = this.makeAPIKeyAuthUrl(auth_url);
+        }
+        return auth_url;
+    }
+
+    private String makeAPIKeyAuthUrl(String auth_url) {
+        if (auth_url.contains("?")) {
+            auth_url = auth_url + "&";
+        }
+        else {
+            auth_url = auth_url + "?";
+        }
+
+        return auth_url + "api_key=" + this.api_key;
     }
 
     private void refreshToken() throws IOException {
@@ -223,12 +289,16 @@ public class RealTimeClient implements AutoCloseable {
 
         String authUrl = this.makeAuthUrl();
 
-        String credential = Credentials.basic(this.username, this.password);
+        Request request = new Request.Builder().url(authUrl).build();
 
-        Request request = new Request.Builder()
-                .url(authUrl)
-                .header("Authorization", credential)
-                .build();
+        if (this.api_key == null || this.api_key.isEmpty()) {
+            String credential = Credentials.basic(this.username, this.password);
+
+            request = new Request.Builder()
+                    .url(authUrl)
+                    .header("Authorization", credential)
+                    .build();
+        }
 
         Response response = client.newCall(request).execute();
         if (response.isSuccessful()) {

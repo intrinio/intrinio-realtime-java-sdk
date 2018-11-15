@@ -24,10 +24,9 @@ For a sample Android project see: [intrinio-realtime-android-sample](https://git
 
 ## Example Usage
 ```java
-String username = "YOUR_INTRINIO_API_USERNAME";
-String password = "YOUR_INTRINIO_API_PASSWORD";
+String api_key = "YOUR_API_KEY";
 
-try (RealTimeClient client = new RealTimeClient(username, password, RealtimeClient.Provider.IEX)) {
+try (RealTimeClient client = new RealTimeClient(api_key, RealTimeClient.Provider.IEX)) {
     client.registerQuoteHandler(new QuoteHandler() {
         public void onQuote(Quote quote) {
             System.out.println(quote.toString());
@@ -38,7 +37,7 @@ try (RealTimeClient client = new RealTimeClient(username, password, RealtimeClie
     client.join(channels);
 
     client.connect();
-};
+}
 ```
 
 ## Handling Quotes and the Queue
@@ -194,38 +193,38 @@ To receive price quotes from IEX, you need to instruct the client to "join" a ch
 Special access is required for both lobby channeles. [Contact us](mailto:sales@intrinio.com) for more information.
 
 ## API Keys
-You will receive your Intrinio API Username and Password after [creating an account](https://intrinio.com/signup). You will need a subscription to a [realtime data feed](https://intrinio.com/marketplace/data/prices/realtime) as well.
+You will receive your Intrinio API Key after [creating an account](https://intrinio.com/signup). You will need a subscription to a [realtime data feed](https://intrinio.com/marketplace/data/prices/realtime) as well.
 
 ## Documentation
 
 ### Methods
 
-`RealTimeClient client = new RealTimeClient(String username, String password, RealTimeClient.Provider provider)` - Creates an Intrinio Real-Time client
+`RealTimeClient client = new RealTimeClient(String api_key, RealTimeClient.Provider provider)` - Creates an Intrinio Real-Time client
+* **Parameter** `api_key`: Your Intrinio API Key
 * **Parameter** `username`: Your Intrinio API Username
 * **Parameter** `password`: Your Intrinio API Password
 * **Parameter** `provider`: The real-time data provider to use
 
 ```java
-String username = "YOUR_INTRINIO_API_USERNAME";
-String password = "YOUR_INTRINIO_API_PASSWORD";
+String api_key = "YOUR_INTRINIO_API_KEY";
 
-RealTimeClient client = new RealTimeClient(username, password, RealTimeClient.Provider.IEX);
+RealTimeClient client = new RealTimeClient(api_key, RealTimeClient.Provider.IEX);
 ```
 
 ---------
 
-`RealTimeClient client = new RealTimeClient(String username, String password, RealTimeClient.Provider provider, Integer maxQueueSize)` - Creates an Intrinio Real-Time client
+`RealTimeClient client = new RealTimeClient(String api_key, RealTimeClient.Provider provider, Integer maxQueueSize)` - Creates an Intrinio Real-Time client
+* **Parameter** `api_key`: Your Intrinio API Key
 * **Parameter** `username`: Your Intrinio API Username
 * **Parameter** `password`: Your Intrinio API Password
 * **Parameter** `provider`: The real-time data provider to use
 * **Parameter** `maxQueueSize`: The maximum size of the quote queue (default size is 10,000)
 
 ```java
-String username = "YOUR_INTRINIO_API_USERNAME";
-String password = "YOUR_INTRINIO_API_PASSWORD";
+String api_key = "YOUR_INTRINIO_API_KEY";
 Integer maxQueueSize = 50000;
 
-RealTimeClient client = new RealTimeClient(username, password, RealTimeClient.Provider.IEX, maxQueueSize);
+RealTimeClient client = new RealTimeClient(api_key, RealTimeClient.Provider.IEX, maxQueueSize);
 ```
 
 ---------

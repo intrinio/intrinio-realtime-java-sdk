@@ -49,8 +49,8 @@ When the Intrinio Realtime library receives quotes from the websocket connection
 Currently, Intrinio offers realtime data for this SDK from the following providers:
 
 * IEX - [Homepage](https://iextrading.com/)
-* QUODD [Homepage](http://home.quodd.com/)
-* CRYPTOQUOTE - [Homepage](https://cryptoquote.io/)
+* QUODD - [Homepage](http://home.quodd.com/)
+* Cryptoquote - [Homepage](https://cryptoquote.io/)
 
 
 Each has distinct price channels and quote formats, but a very similar API.

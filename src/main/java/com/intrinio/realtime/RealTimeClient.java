@@ -33,7 +33,7 @@ public class RealTimeClient implements AutoCloseable {
     private static final Integer HEARTBEAT_INTERVAL = 3000;
     private static final Integer SELF_HEAL_TIME = 1000;
 
-    public enum Provider { IEX, QUODD }
+    public enum Provider { IEX, QUODD, CRYPTOQUOTE }
 
     // API KEY AUTH
     public RealTimeClient(String api_key, Provider provider) {
@@ -69,6 +69,9 @@ public class RealTimeClient implements AutoCloseable {
                         }
                         else if (client.provider.equals(Provider.QUODD)) {
                             msg = "{\"event\": \"heartbeat\", \"data\": {\"action\": \"heartbeat\", \"ticker\": " + System.currentTimeMillis() + "}}";
+                        }
+                        else if (client.provider.equals(Provider.CRYPTOQUOTE)) {
+                            msg = "{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}";
                         }
 
                         if (msg != null && client.ws != null) {
@@ -262,6 +265,10 @@ public class RealTimeClient implements AutoCloseable {
         else if (this.provider.equals(Provider.QUODD)) {
             auth_url = "https://api.intrinio.com/token?type=QUODD";
         }
+        else if (this.provider.equals(Provider.CRYPTOQUOTE)) {
+            auth_url = "https://crypto.intrinio.com/auth";
+        }
+
         if (this.api_key != null && !this.api_key.isEmpty()) {
             auth_url = this.makeAPIKeyAuthUrl(auth_url);
         }
@@ -317,6 +324,9 @@ public class RealTimeClient implements AutoCloseable {
         else if (this.provider.equals(Provider.QUODD)) {
             return "wss://www5.quodd.com/websocket/webStreamer/intrinio/" + this.token;
         }
+        else if (this.provider.equals(Provider.CRYPTOQUOTE)) {
+            return "wss://crypto.intrinio.com/socket/websocket?vsn=1.0.0&token=" + this.token;
+        }
         return null;
     }
 
@@ -330,7 +340,7 @@ public class RealTimeClient implements AutoCloseable {
             @Override
             public void onConnected(WebSocket websocket, Map<String, List<String>> headers) throws Exception {
                 client.logger.info("Websocket opened!");
-                if (client.provider.equals(Provider.IEX)) {
+                if (client.provider.equals(Provider.IEX) || client.provider.equals(Provider.CRYPTOQUOTE)) {
                     client.afterConnect();
                 }
             }
@@ -379,6 +389,12 @@ public class RealTimeClient implements AutoCloseable {
                     else if (json.getString("event").equals("trade")) {
                         JSONObject payload = json.getJSONObject("data");
                         quote = new QuoddTradeQuote(payload);
+                    }
+                }
+                else if (client.provider.equals(Provider.CRYPTOQUOTE)) {
+                    if (json.getString("event").equals("message")) {
+                        JSONObject payload = json.getJSONObject("payload");
+                        quote = new CryptoquoteMessage(payload);
                     }
                 }
 
@@ -443,6 +459,9 @@ public class RealTimeClient implements AutoCloseable {
         else if (this.provider.equals(Provider.QUODD)) {
             message = "{\"event\": \"subscribe\", \"data\": { \"ticker\": " + channel + ", \"action\": \"subscribe\"}}";
         }
+        else if (this.provider.equals(Provider.CRYPTOQUOTE)) {
+            message = "{\"topic\":\"" + channel + "\",\"event\":\"phx_join\",\"payload\":{},\"ref\":null}";
+        }
 
         return message;
     }
@@ -455,6 +474,9 @@ public class RealTimeClient implements AutoCloseable {
         }
         else if (this.provider.equals(Provider.QUODD)) {
             message = "{\"event\": \"unsubscribe\", \"data\": { \"ticker\": " + channel + ", \"action\": \"unsubscribe\"}}";
+        }
+        else if (this.provider.equals(Provider.CRYPTOQUOTE)) {
+            message = "{\"topic\":\"" + channel + "\",\"event\":\"phx_leave\",\"payload\":{},\"ref\":null}";
         }
 
         return message;

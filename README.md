@@ -196,12 +196,10 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
   *    **`book_update`** - a message that denotes a change to an order book
   *    **`ticker`** - a snapshot of the market as depicted by the Exchange
   *    **`trade`** - a trade message (updating `last_trade_price`, `last_trade_time`, and `last_trade_size`)
-*   **pair** - details of the currency pair
-  *    **name** - the name of the currency pair
-  *    **code** - the code of the currency pair
-*   **exchange** - details of the exchange from which the message came from
-  *    **name** - the name of the exchange
-  *    **code** - the code of the exchange
+*   **pair_name** - the name of the currency pair
+*   **pair_code** - the code of the currency pair
+*   **exchange_name** - the name of the exchange
+*   **exchange_code** - the code of the exchange
 *   **side** - the side of the book this update is for
   *    **`buy`** - this is an update to the buy side of the book
   *    **`sell`** - this is an update to the sell side of the book
@@ -236,12 +234,10 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
   *    **`book_update`** - a message that denotes a change to an order book
   *    **`ticker`** - a snapshot of the market as depicted by the Exchange
   *    **`trade`** - a trade message (updating `last_trade_price`, `last_trade_time`, and `last_trade_size`)
-*   **pair** - details of the currency pair
-  *    **name** - the name of the currency pair
-  *    **code** - the code of the currency pair
-*   **exchange** - details of the exchange from which the message came from
-  *    **name** - the name of the exchange
-  *    **code** - the code of the exchange
+*   **pair_name** - the name of the currency pair
+*   **pair_code** - the code of the currency pair
+*   **exchange_name** - the name of the exchange
+*   **exchange_code** - the code of the exchange
 *   **last_updated** - a UTC timestamp of when the ticker was last updated
 *   **ask** - the ask for the currency pair on the exchange
 *   **ask_size** - the size of the ask for the currency pair on the exchange
@@ -288,12 +284,10 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
   *    **`book_update`** - a message that denotes a change to an order book
   *    **`ticker`** - a snapshot of the market as depicted by the Exchange
   *    **`trade`** - a trade message (updating `last_trade_price`, `last_trade_time`, and `last_trade_size`)
-*   **pair** - details of the currency pair
-  *    **name** - the name of the currency pair
-  *    **code** - the code of the currency pair
-*   **exchange** - details of the exchange from which the message came from
-  *    **name** - the name of the exchange
-  *    **code** - the code of the exchange
+*   **pair_name** - the name of the currency pair
+*   **pair_code** - the code of the currency pair
+*   **exchange_name** - the name of the exchange
+*   **exchange_code** - the code of the exchange
 *   **last_updated** - a UTC timestamp of when the ticker was last updated
 *   **ask** - the ask for the currency pair on the exchange
 *   **ask_size** - the size of the ask for the currency pair on the exchange

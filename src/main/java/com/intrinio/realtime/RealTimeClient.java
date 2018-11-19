@@ -392,9 +392,17 @@ public class RealTimeClient implements AutoCloseable {
                     }
                 }
                 else if (client.provider.equals(Provider.CRYPTOQUOTE)) {
-                    if (json.getString("event").equals("message")) {
+                    if (json.getString("event").equals("book_update")) {
                         JSONObject payload = json.getJSONObject("payload");
-                        quote = new CryptoquoteMessage(payload);
+                        quote = new CryptoBookUpdate(payload);
+                    }
+                    else if (json.getString("event").equals("ticker")) {
+                        JSONObject payload = json.getJSONObject("payload");
+                        quote = new CryptoTicker(payload);
+                    }
+                    else if (json.getString("event").equals("trade")) {
+                        JSONObject payload = json.getJSONObject("payload");
+                        quote = new CryptoTrade(payload);
                     }
                 }
 

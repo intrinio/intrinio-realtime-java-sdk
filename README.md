@@ -65,7 +65,7 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
 
 #### Trade Message
 
-```json
+```java
 { "ticker": "AAPL.NB",
   "root_ticker": "AAPL",
   "protocol_id": 301,
@@ -133,7 +133,7 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
 
 #### Quote Message
 
-```json
+```java
 { "ticker": "AAPL.NB",
   "root_ticker": "AAPL",
   "bid_size": 500,
@@ -161,7 +161,7 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
 
 ### IEX
 
-```json
+```java
 { "type": "ask",
   "timestamp": 1493409509.3932788,
   "ticker": "GE",
@@ -181,7 +181,7 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
 ### Cryptoquote
 
 #### Book Update
-```json
+```java
 { "type": "book_update",
   "pair_name": "BTCUSD",
   "pair_code": "btcusd",
@@ -207,7 +207,7 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
 *   **size** - the size of this book entry
 
 #### Ticker
-```json
+```java
 { "type": "ticker",
   "pair_name": "BTCUSD",
   "pair_code": "btcusd",
@@ -257,7 +257,7 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
 *   **last_trade_size** - the size of the last trade for the currency pair on the exchange
 
 #### Trade
-```json
+```java
 { "type": "trade",
   "pair_name": "BTCUSD",
   "par_code": "btcusd",
@@ -277,7 +277,7 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
   "last_trade_time": "2018-10-29 23:08:01.834Z",
   "last_trade_side": "sell",
   "last_trade_price": 6343.7124,
-  "last_trade_size": 1.6045,
+  "last_trade_size": 1.6045 }
 ```
 
 *   **type** - the type of message this is

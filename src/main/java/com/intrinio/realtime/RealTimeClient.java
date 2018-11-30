@@ -41,65 +41,26 @@ public class RealTimeClient implements AutoCloseable {
     }
 
     public RealTimeClient(String api_key, Provider provider, Integer maxQueueSize) {
-        this.api_key = api_key;
-        this.provider = provider;
-
-        if (this.api_key == null || this.api_key.isEmpty()) {
-            throw new IllegalArgumentException("API Key is required");
-        }
-
-        this.logger = Logger.getLogger(RealTimeClient.class.getName());
-        this.ready = false;
-        this.queue = new ArrayBlockingQueue<Quote>(maxQueueSize);
-        this.channels = new HashSet<String>();
-        this.joinedChannels = new HashSet<String>();
-
-        // Setup heartbeat
-        final RealTimeClient client = this;
-        Thread heartbeat = new Thread() {
-            @Override
-            public void run() {
-                try {
-                    while (true) {
-                        sleep(HEARTBEAT_INTERVAL);
-
-                        String msg = null;
-                        if (client.provider.equals(Provider.IEX)) {
-                            msg = "{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}";
-                        }
-                        else if (client.provider.equals(Provider.QUODD)) {
-                            msg = "{\"event\": \"heartbeat\", \"data\": {\"action\": \"heartbeat\", \"ticker\": " + System.currentTimeMillis() + "}}";
-                        }
-
-                        if (msg != null && client.ws != null) {
-                            client.ws.sendText(msg);
-                        }
-                    }
-                }
-                catch (InterruptedException e) { }
-            }
-        };
-
-        heartbeat.start();
-        this.threadsRunning.add(heartbeat);
+        this(api_key, null, null, provider, maxQueueSize);
     }
 
     // BASIC AUTH
     public RealTimeClient(String username, String password, Provider provider) {
-        this(username, password, provider, MAX_QUEUE_SIZE);
+        this(null, username, password, provider, MAX_QUEUE_SIZE);
     }
 
-    public RealTimeClient(String username, String password, Provider provider, Integer maxQueueSize) {
+    public RealTimeClient(String api_key, String username, String password, Provider provider, Integer maxQueueSize) {
+        this.api_key = api_key;
         this.username = username;
         this.password = password;
         this.provider = provider;
 
-        if (this.username == null || this.username.isEmpty()) {
-            throw new IllegalArgumentException("Username is required");
-        }
+        boolean has_api_key =  this.api_key == null || this.api_key.isEmpty();
+        boolean has_username =  this.username == null || this.username.isEmpty();
+        boolean has_password =  this.password == null || this.password.isEmpty();
 
-        if (this.password == null || this.password.isEmpty()) {
-            throw new IllegalArgumentException("Password is required");
+        if (!has_api_key && !has_username && !has_password) {
+            throw new IllegalArgumentException("Authentication is required");
         }
 
         this.logger = Logger.getLogger(RealTimeClient.class.getName());

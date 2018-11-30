@@ -341,8 +341,6 @@ You will receive your Intrinio API Key after [creating an account](https://intri
 
 `RealTimeClient client = new RealTimeClient(String api_key, RealTimeClient.Provider provider)` - Creates an Intrinio Real-Time client
 * **Parameter** `api_key`: Your Intrinio API Key
-* **Parameter** `username`: Your Intrinio API Username
-* **Parameter** `password`: Your Intrinio API Password
 * **Parameter** `provider`: The real-time data provider to use
 
 ```java
@@ -355,8 +353,6 @@ RealTimeClient client = new RealTimeClient(api_key, RealTimeClient.Provider.IEX)
 
 `RealTimeClient client = new RealTimeClient(String api_key, RealTimeClient.Provider provider, Integer maxQueueSize)` - Creates an Intrinio Real-Time client
 * **Parameter** `api_key`: Your Intrinio API Key
-* **Parameter** `username`: Your Intrinio API Username
-* **Parameter** `password`: Your Intrinio API Password
 * **Parameter** `provider`: The real-time data provider to use
 * **Parameter** `maxQueueSize`: The maximum size of the quote queue (default size is 10,000)
 

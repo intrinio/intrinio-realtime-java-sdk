@@ -17,6 +17,7 @@ public class RealTimeClient implements AutoCloseable {
 
     private String username;
     private String password;
+    private String api_key;
     private Provider provider;
     private Logger logger;
     private Boolean ready;
@@ -34,21 +35,32 @@ public class RealTimeClient implements AutoCloseable {
 
     public enum Provider { IEX, QUODD }
 
-    public RealTimeClient(String username, String password, Provider provider) {
-        this(username, password, provider, MAX_QUEUE_SIZE);
+    // API KEY AUTH
+    public RealTimeClient(String api_key, Provider provider) {
+        this(api_key, provider, MAX_QUEUE_SIZE);
     }
 
-    public RealTimeClient(String username, String password, Provider provider, Integer maxQueueSize) {
+    public RealTimeClient(String api_key, Provider provider, Integer maxQueueSize) {
+        this(api_key, null, null, provider, maxQueueSize);
+    }
+
+    // BASIC AUTH
+    public RealTimeClient(String username, String password, Provider provider) {
+        this(null, username, password, provider, MAX_QUEUE_SIZE);
+    }
+
+    public RealTimeClient(String api_key, String username, String password, Provider provider, Integer maxQueueSize) {
+        this.api_key = api_key;
         this.username = username;
         this.password = password;
         this.provider = provider;
 
-        if (this.username == null || this.username.isEmpty()) {
-            throw new IllegalArgumentException("Username is required");
-        }
+        boolean has_api_key =  this.api_key == null || this.api_key.isEmpty();
+        boolean has_username =  this.username == null || this.username.isEmpty();
+        boolean has_password =  this.password == null || this.password.isEmpty();
 
-        if (this.password == null || this.password.isEmpty()) {
-            throw new IllegalArgumentException("Password is required");
+        if (!has_api_key && !has_username && !has_password) {
+            throw new IllegalArgumentException("Authentication is required");
         }
 
         this.logger = Logger.getLogger(RealTimeClient.class.getName());
@@ -204,13 +216,28 @@ public class RealTimeClient implements AutoCloseable {
     }
 
     private String makeAuthUrl() {
+        String auth_url = null;
         if (this.provider.equals(Provider.IEX)) {
-            return "https://realtime.intrinio.com/auth";
+            auth_url = "https://realtime.intrinio.com/auth";
         }
         else if (this.provider.equals(Provider.QUODD)) {
-            return "https://api.intrinio.com/token?type=QUODD";
+            auth_url = "https://api.intrinio.com/token?type=QUODD";
         }
-        return null;
+        if (this.api_key != null && !this.api_key.isEmpty()) {
+            auth_url = this.makeAPIKeyAuthUrl(auth_url);
+        }
+        return auth_url;
+    }
+
+    private String makeAPIKeyAuthUrl(String auth_url) {
+        if (auth_url.contains("?")) {
+            auth_url = auth_url + "&";
+        }
+        else {
+            auth_url = auth_url + "?";
+        }
+
+        return auth_url + "api_key=" + this.api_key;
     }
 
     private void refreshToken() throws IOException {
@@ -223,12 +250,16 @@ public class RealTimeClient implements AutoCloseable {
 
         String authUrl = this.makeAuthUrl();
 
-        String credential = Credentials.basic(this.username, this.password);
+        Request request = new Request.Builder().url(authUrl).build();
 
-        Request request = new Request.Builder()
-                .url(authUrl)
-                .header("Authorization", credential)
-                .build();
+        if (this.api_key == null || this.api_key.isEmpty()) {
+            String credential = Credentials.basic(this.username, this.password);
+
+            request = new Request.Builder()
+                    .url(authUrl)
+                    .header("Authorization", credential)
+                    .build();
+        }
 
         Response response = client.newCall(request).execute();
         if (response.isSuccessful()) {

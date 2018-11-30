@@ -278,12 +278,18 @@ Special access is required for both lobby channels. [Contact us](mailto:sales@in
 
 To receive price quotes from Cryptoquote, you need to instruct the client to "join" a channel. A channel can be
 
-* `crypto:market_level_1:{pair_code}` - the Level 1 Market channel where all Level 1 price updates for the provided currency pair in all exchanges are posted (i.e. `crypto:pair:market_level_1:btcusd`)
+* `crypto:market_level_1:{pair_code}` - the Level 1 Market channel where all Level 1 price updates for the provided currency pair in all exchanges are posted (i.e. `crypto:market_level_1:btcusd`)
 * `crypto:exchange_level_1:{exchange_code}:{pair_code}` - the Level 1 Market channel where all Level 1 price updates for the provided currency pair and exchange are posted
 * `crypto:exchange_level_2:{exchange_code}:{pair_code}` - the Level 2 Market channel where all Level 2 book updates for the provided currency pair and exchange are posted
 * `crypto:firehose` - the Firehose channel where all message types for all currency pairs are posted (special access required)
 
+The Intrinio REST API provides a listing of pairs, exchanges, and their corresponding codes:
+
+* [Crypto Currency Pairs](https://intrinio.com/documentation/download#crypto_currency_pairs)
+* [Crypto Exchanges](https://intrinio.com/documentation/download#crypto_exchanges)
+
 ## API Keys
+
 You will receive your Intrinio API Key after [creating an account](https://intrinio.com/signup). You will need a subscription to a [realtime data feed](https://intrinio.com/marketplace/data/prices/realtime) as well.
 
 ## Documentation

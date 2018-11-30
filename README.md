@@ -1,6 +1,6 @@
-# Intrinio Java SDK for Real-Time Stock Prices
+# Intrinio Java SDK for Real-Time Stock & Crypto Prices
 
-[Intrinio](https://intrinio.com/) provides real-time stock prices via a two-way WebSocket connection. To get started, [subscribe to a real-time data feed](https://intrinio.com/marketplace/data/prices/realtime) and follow the instructions below.
+[Intrinio](https://intrinio.com/) provides real-time stock & crypto prices via a two-way WebSocket connection. To get started, [subscribe to a real-time data feed](https://intrinio.com/marketplace/data/prices/realtime) and follow the instructions below.
 
 ## Requirements
 
@@ -19,8 +19,8 @@ For a sample Android project see: [intrinio-realtime-android-sample](https://git
 ## Features
 
 * Receive streaming, real-time price quotes (last trade, bid, ask)
-* Subscribe to updates from individual securities
-* Subscribe to updates for all securities (contact us for special access)
+* Subscribe to updates from individual securities or cryptos
+* Subscribe to updates for all securities or cryptos (contact us for special access)
 
 ## Example Usage
 ```java
@@ -180,35 +180,12 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
 
 ### Cryptoquote
 
-#### Book Update
-```java
-{ "type": "book_update",
-  "pair_name": "BTCUSD",
-  "pair_code": "btcusd",
-  "exchange_name": "Gemini",
-  "exchange_code": "gemini",
-  "side": "buy",
-  "price": 6337.4,
-  "size": 0.3 }
-```
+#### Level 1 - Price Update
 
-*   **type** - the type of message this is
-  *    **`book_update`** - a message that denotes a change to an order book
-  *    **`ticker`** - a snapshot of the market as depicted by the Exchange
-  *    **`trade`** - a trade message (updating `last_trade_price`, `last_trade_time`, and `last_trade_size`)
-*   **pair_name** - the name of the currency pair
-*   **pair_code** - the code of the currency pair
-*   **exchange_name** - the name of the exchange
-*   **exchange_code** - the code of the exchange
-*   **side** - the side of the book this update is for
-  *    **`buy`** - this is an update to the buy side of the book
-  *    **`sell`** - this is an update to the sell side of the book
-*   **price** - the price of this book entry
-*   **size** - the size of this book entry
+NOTE: Null values for some fields denote no change from previous value.
 
-#### Ticker
 ```java
-{ "type": "ticker",
+{ "type": "level_1",
   "pair_name": "BTCUSD",
   "pair_code": "btcusd",
   "exchange_name": "Binance",
@@ -231,9 +208,8 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
 ```
 
 *   **type** - the type of message this is
-  *    **`book_update`** - a message that denotes a change to an order book
-  *    **`ticker`** - a snapshot of the market as depicted by the Exchange
-  *    **`trade`** - a trade message (updating `last_trade_price`, `last_trade_time`, and `last_trade_size`)
+  *    **`level_1`** - a messages that denotes a change to the last traded price or top-of-the-book bid or ask
+  *    **`level_2`** - a message that denotes a change to an order book
 *   **pair_name** - the name of the currency pair
 *   **pair_code** - the code of the currency pair
 *   **exchange_name** - the name of the exchange
@@ -256,55 +232,31 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
 *   **last_trade_price** - the price of the last trade for the currency pair on the exchange
 *   **last_trade_size** - the size of the last trade for the currency pair on the exchange
 
-#### Trade
+#### Level 2 - Book Update
+
 ```java
-{ "type": "trade",
+{ "type": "level_2",
   "pair_name": "BTCUSD",
-  "par_code": "btcusd",
+  "pair_code": "btcusd",
   "exchange_name": "Gemini",
   "exchange_code": "gemini",
-  "last_updated": "2018-10-29 23:08:02.277Z",
-  "bid": null,
-  "bid_size": null,
-  "ask": null,
-  "ask_size": null,
-  "change": -133.40760000000046,
-  "change_percent": -2.059762280845255,
-  "volume": 22121.79710206001,
-  "open": 6476.8445,
-  "high": 6506.2724,
-  "low": 6311,
-  "last_trade_time": "2018-10-29 23:08:01.834Z",
-  "last_trade_side": "sell",
-  "last_trade_price": 6343.7124,
-  "last_trade_size": 1.6045 }
+  "side": "buy",
+  "price": 6337.4,
+  "size": 0.3 }
 ```
 
 *   **type** - the type of message this is
-  *    **`book_update`** - a message that denotes a change to an order book
-  *    **`ticker`** - a snapshot of the market as depicted by the Exchange
-  *    **`trade`** - a trade message (updating `last_trade_price`, `last_trade_time`, and `last_trade_size`)
+  *    **`level_1`** - a messages that denotes a change to the last traded price or top-of-the-book bid or ask
+  *    **`level_2`** - a message that denotes a change to an order book
 *   **pair_name** - the name of the currency pair
 *   **pair_code** - the code of the currency pair
 *   **exchange_name** - the name of the exchange
 *   **exchange_code** - the code of the exchange
-*   **last_updated** - a UTC timestamp of when the ticker was last updated
-*   **ask** - the ask for the currency pair on the exchange
-*   **ask_size** - the size of the ask for the currency pair on the exchange
-*   **bid** - the bid for the currency pair on the exchange
-*   **bid_size** - the size of the bid for the currency pair on the exchange
-*   **change** - the notional change in price since the last ticker
-*   **change_percent** - the percent change in price since the last ticker
-*   **volume** - the volume of the currency pair on the exchange
-*   **open** - the opening price of the currency pair on the exchange
-*   **high** - the highest price of the currency pair on the exchange
-*   **low** - the lowest price of the currency pair on the exchange
-*   **last_trade_time** - a UTC timestamp of the last trade for the currency pair on the exchange
-*   **last_trade_side** - the side of the last trade
+*   **side** - the side of the book this update is for
   *    **`buy`** - this is an update to the buy side of the book
   *    **`sell`** - this is an update to the sell side of the book
-*   **last_trade_price** - the price of the last trade for the currency pair on the exchange
-*   **last_trade_size** - the size of the last trade for the currency pair on the exchange
+*   **price** - the price of this book entry
+*   **size** - the size of this book entry
 
 ## Channels
 
@@ -325,12 +277,11 @@ Special access is required for both lobby channels. [Contact us](mailto:sales@in
 ### Cryptoquote
 
 To receive price quotes from Cryptoquote, you need to instruct the client to "join" a channel. A channel can be
-* The lobby (`crypto:lobby`) where all message types for all currency pairs are posted
-* The type lobby (`crypto:lobby:{message_type}`) where all messages for the given type for all currency pairs are posted (i.e. `crypto:lobby:trade`)
-* The pair lobby (`crypto:pair:{pair_code}`) where all message types for the provided currency pair are posted (i.e. `crypto:pair:btcusd`)
-* The book_update pair lobby (`crypto:pair:book_update:{pair_code}`) where book_updates for the provided currency pair are posted (i.e. `crypto:pair:book_update:btcusd`)
-* The ticker pair lobby (`crypto:pair:ticker:{pair_code}`) where tickers for the provided currency pair are posted (i.e. `crypto:pair:ticker:btcusd`)
-* The trade pair lobby (`crypto:pair:trade:{pair_code}`) where trades for the provided currency pair are posted (i.e. `crypto:pair:trade:btcusd`)
+
+* `crypto:market_level_1:{pair_code}` - the Level 1 Market channel where all Level 1 price updates for the provided currency pair in all exchanges are posted (i.e. `crypto:pair:market_level_1:btcusd`)
+* `crypto:exchange_level_1:{exchange_code}:{pair_code}` - the Level 1 Market channel where all Level 1 price updates for the provided currency pair and exchange are posted
+* `crypto:exchange_level_2:{exchange_code}:{pair_code}` - the Level 2 Market channel where all Level 2 book updates for the provided currency pair and exchange are posted
+* `crypto:firehose` - the Firehose channel where all message types for all currency pairs are posted (special access required)
 
 ## API Keys
 You will receive your Intrinio API Key after [creating an account](https://intrinio.com/signup). You will need a subscription to a [realtime data feed](https://intrinio.com/marketplace/data/prices/realtime) as well.

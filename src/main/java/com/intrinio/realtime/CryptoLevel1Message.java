@@ -3,7 +3,7 @@ package com.intrinio.realtime;
 import org.json.JSONObject;
 import java.math.BigDecimal;
 
-public class CryptoTrade implements Quote {
+public class CryptoLevel1Message implements Quote {
     private String type;
 
     private String pair_name;
@@ -27,7 +27,7 @@ public class CryptoTrade implements Quote {
     private Float last_trade_price;
     private Float last_trade_size;
 
-    public CryptoTrade(JSONObject message) {
+    public CryptoLevel1Message(JSONObject message) {
         this.type = message.getString("type");
 
         this.pair_name = message.getString("pair_name");
@@ -145,7 +145,7 @@ public class CryptoTrade implements Quote {
 
     @Override
     public String toString() {
-        return "CryptoTrade(type: " + this.type +
+        return "CryptoLevel1Message(type: " + this.type +
                 ", pair_name: " + this.pair_name +
                 ", pair_code: " + this.pair_code +
                 ", exchange_name: " + this.exchange_name +

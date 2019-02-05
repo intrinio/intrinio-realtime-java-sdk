@@ -234,7 +234,7 @@ public class RealTimeClient implements AutoCloseable {
             auth_url = "https://crypto.intrinio.com/auth";
         }
         else if (this.provider.equals(Provider.FXCM)) {
-            auth_url = "https://6c8589e4.ngrok.io/auth";
+            auth_url = "https://fxcm.intrinio.com/auth";
         }
 
         if (this.api_key != null && !this.api_key.isEmpty()) {
@@ -296,7 +296,7 @@ public class RealTimeClient implements AutoCloseable {
             return "wss://crypto.intrinio.com/socket/websocket?vsn=1.0.0&token=" + this.token;
         }
         else if (this.provider.equals(Provider.FXCM)) {
-            return "wss://6c8589e4.ngrok.io/socket/websocket?vsn=1.0.0&token=" + this.token;
+            return "wss://fxcm.intrinio.com/socket/websocket?vsn=1.0.0&token=" + this.token;
         }
         return null;
     }
@@ -343,7 +343,14 @@ public class RealTimeClient implements AutoCloseable {
                 JSONObject json = new JSONObject(message);
                 Quote quote = null;
 
-                if (client.provider.equals(Provider.IEX)) {
+                if (json.getString("event").equals("phx_reply")) {
+                    JSONObject payload = json.getJSONObject("payload");
+                    if (payload.getString("status").equals("error")) {
+                        client.logger.log(Level.SEVERE, "Websocket error " + payload.getString("response"));
+                    }
+
+                }
+                else if (client.provider.equals(Provider.IEX)) {
                     if (json.getString("event").equals("quote")) {
                         JSONObject payload = json.getJSONObject("payload");
                         quote = new IexQuote(payload);

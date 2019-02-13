@@ -33,7 +33,7 @@ public class RealTimeClient implements AutoCloseable {
     private static final Integer HEARTBEAT_INTERVAL = 3000;
     private static final Integer SELF_HEAL_TIME = 1000;
 
-    public enum Provider { IEX, QUODD, CRYPTOQUOTE }
+    public enum Provider { IEX, QUODD, CRYPTOQUOTE, FXCM }
 
     // API KEY AUTH
     public RealTimeClient(String api_key, Provider provider) {
@@ -86,6 +86,9 @@ public class RealTimeClient implements AutoCloseable {
                             msg = "{\"event\": \"heartbeat\", \"data\": {\"action\": \"heartbeat\", \"ticker\": " + System.currentTimeMillis() + "}}";
                         }
                         else if (client.provider.equals(Provider.CRYPTOQUOTE)) {
+                            msg = "{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}";
+                        }
+                        else if (client.provider.equals(Provider.FXCM)) {
                             msg = "{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}";
                         }
 
@@ -230,6 +233,9 @@ public class RealTimeClient implements AutoCloseable {
         else if (this.provider.equals(Provider.CRYPTOQUOTE)) {
             auth_url = "https://crypto.intrinio.com/auth";
         }
+        else if (this.provider.equals(Provider.FXCM)) {
+            auth_url = "https://fxcm.intrinio.com/auth";
+        }
 
         if (this.api_key != null && !this.api_key.isEmpty()) {
             auth_url = this.makeAPIKeyAuthUrl(auth_url);
@@ -289,6 +295,9 @@ public class RealTimeClient implements AutoCloseable {
         else if (this.provider.equals(Provider.CRYPTOQUOTE)) {
             return "wss://crypto.intrinio.com/socket/websocket?vsn=1.0.0&token=" + this.token;
         }
+        else if (this.provider.equals(Provider.FXCM)) {
+            return "wss://fxcm.intrinio.com/socket/websocket?vsn=1.0.0&token=" + this.token;
+        }
         return null;
     }
 
@@ -302,7 +311,7 @@ public class RealTimeClient implements AutoCloseable {
             @Override
             public void onConnected(WebSocket websocket, Map<String, List<String>> headers) throws Exception {
                 client.logger.info("Websocket opened!");
-                if (client.provider.equals(Provider.IEX) || client.provider.equals(Provider.CRYPTOQUOTE)) {
+                if (client.provider.equals(Provider.IEX) || client.provider.equals(Provider.CRYPTOQUOTE) || client.provider.equals(Provider.FXCM)) {
                     client.afterConnect();
                 }
             }
@@ -334,7 +343,14 @@ public class RealTimeClient implements AutoCloseable {
                 JSONObject json = new JSONObject(message);
                 Quote quote = null;
 
-                if (client.provider.equals(Provider.IEX)) {
+                if (json.getString("event").equals("phx_reply")) {
+                    JSONObject payload = json.getJSONObject("payload");
+                    if (payload.getString("status").equals("error")) {
+                        client.logger.log(Level.SEVERE, "Websocket error " + payload.getString("response"));
+                    }
+
+                }
+                else if (client.provider.equals(Provider.IEX)) {
                     if (json.getString("event").equals("quote")) {
                         JSONObject payload = json.getJSONObject("payload");
                         quote = new IexQuote(payload);
@@ -365,6 +381,12 @@ public class RealTimeClient implements AutoCloseable {
                     else if (json.getString("event").equals("trade")) {
                         JSONObject payload = json.getJSONObject("payload");
                         quote = new CryptoLevel1Message(payload);
+                    }
+                }
+                else if (client.provider.equals(Provider.FXCM)) {
+                    if (json.getString("event").equals("price_update")) {
+                        JSONObject payload = json.getJSONObject("payload");
+                        quote = new FxcmPriceUpdate(payload);
                     }
                 }
 
@@ -432,6 +454,9 @@ public class RealTimeClient implements AutoCloseable {
         else if (this.provider.equals(Provider.CRYPTOQUOTE)) {
             message = "{\"topic\":\"" + channel + "\",\"event\":\"phx_join\",\"payload\":{},\"ref\":null}";
         }
+        else if (this.provider.equals(Provider.FXCM)) {
+            message = "{\"topic\":\"" + channel + "\",\"event\":\"phx_join\",\"payload\":{},\"ref\":null}";
+        }
 
         return message;
     }
@@ -446,6 +471,9 @@ public class RealTimeClient implements AutoCloseable {
             message = "{\"event\": \"unsubscribe\", \"data\": { \"ticker\": " + channel + ", \"action\": \"unsubscribe\"}}";
         }
         else if (this.provider.equals(Provider.CRYPTOQUOTE)) {
+            message = "{\"topic\":\"" + channel + "\",\"event\":\"phx_leave\",\"payload\":{},\"ref\":null}";
+        }
+        else if (this.provider.equals(Provider.FXCM)) {
             message = "{\"topic\":\"" + channel + "\",\"event\":\"phx_leave\",\"payload\":{},\"ref\":null}";
         }
 

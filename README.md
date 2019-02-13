@@ -51,6 +51,7 @@ Currently, Intrinio offers realtime data for this SDK from the following provide
 * IEX - [Homepage](https://iextrading.com/)
 * QUODD - [Homepage](http://home.quodd.com/)
 * Cryptoquote - [Homepage](https://cryptoquote.io/)
+* FXCM - [Homepage](https://www.fxcm.com/)
 
 
 Each has distinct price channels and quote formats, but a very similar API.
@@ -258,6 +259,21 @@ NOTE: Null values for some fields denote no change from previous value.
 *   **price** - the price of this book entry
 *   **size** - the size of this book entry
 
+### FXCM
+
+#### Price update
+```java
+{ code: "EUR/USD",
+  bid_price: 1.13685,
+  ask_price: 1.13711,
+  time: "2018-12-18 22:38:06.964Z" }
+```
+
+*   **code** - the code of the fx currency pair
+*   **bid_price** - the bid price is the price a buyer is willing to pay
+*   **ask_price** - the ask price is the price a seller is willing to accept
+*   **time** - the UTC timestamp of the price update
+
 ## Channels
 
 ### QUODD
@@ -287,6 +303,19 @@ The Intrinio REST API provides a listing of pairs, exchanges, and their correspo
 
 * [Crypto Currency Pairs](https://docs.intrinio.com/documentation/download/crypto_pairs)
 * [Crypto Exchanges](https://docs.intrinio.com/documentation/download/crypto_exchanges)
+
+### FXCM
+
+To receive price quotes from FXCM, you need to instruct the client to "join" a channel. A channel can be
+
+* `fxcm:pair:{pair_code}` - the fx currency pair channel where price updates for the provided currency pair are posted (i.e. `fxcm:pair:EUR/USD`)
+* `fxcm:base:{currency_code}` - the fx currency channel where prices updates for any fx currency pair that has the provided currency as the base currency (i.e. `fxcm:base:EUR` would post prices from EUR/USD, EUR/JPY, etc.)
+* `fxcm:quote:{currency_code}` - the fx currency channel where prices updates for any fx currency pair that has the provided currency as the quote currency (i.e. `fxcm:quote:EUR` would post prices from EUR/USD, JPY/USD, etc.)
+
+The Intrinio REST API provides a listing of pairs, currencies, and their corresponding codes:
+
+* [FX Currencies](https://intrinio.com/documentation/api/currencies)
+* [FX Currency Pairs](https://intrinio.com/documentation/api/currency_pairs)
 
 ## API Keys
 

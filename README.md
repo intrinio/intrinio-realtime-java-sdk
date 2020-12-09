@@ -1,6 +1,6 @@
-# Intrinio Java SDK for Real-Time Stock, Forex, and Crypto Prices
+# Intrinio Java SDK for Real-Time Stock and Forex Prices
 
-[Intrinio](https://intrinio.com/) provides real-time stock, forex, and crypto prices via a two-way WebSocket connection. To get started, [subscribe to a real-time data feed](https://intrinio.com/marketplace/data/prices/realtime) and follow the instructions below.
+[Intrinio](https://intrinio.com/) provides real-time stock and forex prices via a two-way WebSocket connection. To get started, [subscribe to a real-time data feed](https://intrinio.com/marketplace/data/prices/realtime) and follow the instructions below.
 
 ## Requirements
 
@@ -19,8 +19,8 @@ For a sample Android project see: [intrinio-realtime-android-sample](https://git
 ## Features
 
 * Receive streaming, real-time price quotes (last trade, bid, ask)
-* Subscribe to updates from individual securities, forex pairs, or cryptos
-* Subscribe to updates for all securities, forex pairs, or cryptos (contact us for special access)
+* Subscribe to updates from individual securities or forex pairs
+* Subscribe to updates for all securities or forex pairs
 
 ## Example Usage
 ```java
@@ -50,7 +50,6 @@ Currently, Intrinio offers realtime data for this SDK from the following provide
 
 * IEX - [Homepage](https://iextrading.com/)
 * QUODD - [Homepage](http://home.quodd.com/)
-* Cryptoquote - [Homepage](https://cryptoquote.io/)
 * FXCM - [Homepage](https://www.fxcm.com/)
 
 
@@ -179,86 +178,6 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
 *   **size** - the size of the `last` trade, or total volume of orders at the top-of-book `bid` or `ask` price
 *   **price** - the price in USD
 
-### Cryptoquote
-
-#### Level 1 - Price Update
-
-NOTE: Null values for some fields denote no change from previous value.
-
-```java
-{ "type": "level_1",
-  "pair_name": "BTCUSD",
-  "pair_code": "btcusd",
-  "exchange_name": "Binance",
-  "exchange_code": "binance",
-  "last_updated": "2018-10-29 23:08:02.277Z",
-  "bid": 6326,
-  "bid_size": 6.51933000,
-  "ask": 6326.97,
-  "ask_size": 6.12643000,
-  "change": -151.6899999999996,
-  "change_percent": -2.340895061728389,
-  "volume": 13777.232772,
-  "open": 6480,
-  "high": 6505.01,
-  "low": 6315,
-  "last_trade_time": "2018-10-29 23:08:01.834Z",
-  "last_trade_side": null,
-  "last_trade_price": 6326.97000000,
-  "last_trade_size": 0.00001200 }
-```
-
-*   **type** - the type of message this is
-  *    **`level_1`** - a messages that denotes a change to the last traded price or top-of-the-book bid or ask
-  *    **`level_2`** - a message that denotes a change to an order book
-*   **pair_name** - the name of the currency pair
-*   **pair_code** - the code of the currency pair
-*   **exchange_name** - the name of the exchange
-*   **exchange_code** - the code of the exchange
-*   **last_updated** - a UTC timestamp of when the ticker was last updated
-*   **ask** - the ask for the currency pair on the exchange
-*   **ask_size** - the size of the ask for the currency pair on the exchange
-*   **bid** - the bid for the currency pair on the exchange
-*   **bid_size** - the size of the bid for the currency pair on the exchange
-*   **change** - the notional change in price since the last ticker
-*   **change_percent** - the percent change in price since the last ticker
-*   **volume** - the volume of the currency pair on the exchange
-*   **open** - the opening price of the currency pair on the exchange
-*   **high** - the highest price of the currency pair on the exchange
-*   **low** - the lowest price of the currency pair on the exchange
-*   **last_trade_time** - a UTC timestamp of the last trade for the currency pair on the exchange
-*   **last_trade_side** - the side of the last trade
-  *    **`buy`** - this is an update to the buy side of the book
-  *    **`sell`** - this is an update to the sell side of the book
-*   **last_trade_price** - the price of the last trade for the currency pair on the exchange
-*   **last_trade_size** - the size of the last trade for the currency pair on the exchange
-
-#### Level 2 - Book Update
-
-```java
-{ "type": "level_2",
-  "pair_name": "BTCUSD",
-  "pair_code": "btcusd",
-  "exchange_name": "Gemini",
-  "exchange_code": "gemini",
-  "side": "buy",
-  "price": 6337.4,
-  "size": 0.3 }
-```
-
-*   **type** - the type of message this is
-  *    **`level_1`** - a messages that denotes a change to the last traded price or top-of-the-book bid or ask
-  *    **`level_2`** - a message that denotes a change to an order book
-*   **pair_name** - the name of the currency pair
-*   **pair_code** - the code of the currency pair
-*   **exchange_name** - the name of the exchange
-*   **exchange_code** - the code of the exchange
-*   **side** - the side of the book this update is for
-  *    **`buy`** - this is an update to the buy side of the book
-  *    **`sell`** - this is an update to the sell side of the book
-*   **price** - the price of this book entry
-*   **size** - the size of this book entry
-
 ### FXCM
 
 #### Price update
@@ -289,20 +208,6 @@ To receive price quotes from IEX, you need to instruct the client to "join" a ch
 * The security last price lobby (`$lobby_last_price`) where only last price quotes for all securities are posted
 
 Special access is required for both lobby channels. [Contact us](mailto:sales@intrinio.com) for more information.
-
-### Cryptoquote
-
-To receive price quotes from Cryptoquote, you need to instruct the client to "join" a channel. A channel can be
-
-* `crypto:market_level_1:{pair_code}` - the Level 1 Market channel where all Level 1 price updates for the provided currency pair in all exchanges are posted (i.e. `crypto:market_level_1:btcusd`)
-* `crypto:exchange_level_1:{exchange_code}:{pair_code}` - the Level 1 Market channel where all Level 1 price updates for the provided currency pair and exchange are posted
-* `crypto:exchange_level_2:{exchange_code}:{pair_code}` - the Level 2 Market channel where all Level 2 book updates for the provided currency pair and exchange are posted
-* `crypto:firehose` - the Firehose channel where all message types for all currency pairs are posted (special access required)
-
-The Intrinio REST API provides a listing of pairs, exchanges, and their corresponding codes:
-
-* [Crypto Currency Pairs](https://docs.intrinio.com/documentation/download/crypto_pairs)
-* [Crypto Exchanges](https://docs.intrinio.com/documentation/download/crypto_exchanges)
 
 ### FXCM
 

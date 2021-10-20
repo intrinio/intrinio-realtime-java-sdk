@@ -1,8 +1,7 @@
 {
 	"apiKey": "",
-	"provider": "MANUAL",
+	"provider": "REALTIME",
 	"symbols": [ "GOOG", "MSFT", "AAPL" ],
 	"tradesOnly": false,
-	"numThreads": 4,
-	"ipAddress": ""
+	"numThreads": 4
 }

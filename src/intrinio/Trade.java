@@ -11,7 +11,11 @@ import java.time.ZonedDateTime;
 import java.time.zone.ZoneRules;
 import java.util.Date;
 
-public record Trade(String symbol, double price, long size, ZonedDateTime timestamp, long totalVolume) {
+/**
+ * A trade. "timestamp" is in nanoseconds since unix epoch.
+ * @author Intrinio *
+ */
+public record Trade(String symbol, double price, long size, long timestamp, long totalVolume) {
 	
 	public String toString() {
 		String s =
@@ -38,21 +42,13 @@ public record Trade(String symbol, double price, long size, ZonedDateTime timest
 		
 		ByteBuffer timeStampBuffer = ByteBuffer.wrap(bytes, 10 + symbolLength, 8);
 		timeStampBuffer.order(ByteOrder.LITTLE_ENDIAN);
-		long nanoSecondsSinceEpoch = timeStampBuffer.getLong();
-		long epochSecond = nanoSecondsSinceEpoch / 1000000000L;
-		long nanoOfSecond = nanoSecondsSinceEpoch % 1000000000L;
-	    ZoneId tz = ZoneId.of("America/New_York");
-	    ZoneRules rules = tz.getRules();
-        Instant instant = Instant.ofEpochSecond(epochSecond, (int)nanoOfSecond);
-        ZoneOffset offset = rules.getOffset(instant);
-        LocalDateTime ldt = LocalDateTime.ofEpochSecond(epochSecond, (int)nanoOfSecond, offset);
-        ZonedDateTime zdt = ZonedDateTime.ofLocal(ldt, tz, offset);
+		long nanoSecondsSinceEpoch = timeStampBuffer.getLong();		
 		
 		ByteBuffer volumeBuffer = ByteBuffer.wrap(bytes, 18 + symbolLength, 4);
 		volumeBuffer.order(ByteOrder.LITTLE_ENDIAN);
 		long totalVolume = Integer.toUnsignedLong(volumeBuffer.getInt());
 		
-		return new Trade(symbol, price, size, zdt, totalVolume);
+		return new Trade(symbol, price, size, nanoSecondsSinceEpoch, totalVolume);
 	}
 	
 	public static Trade parse(ByteBuffer bytes, int symbolLength) {
@@ -69,20 +65,12 @@ public record Trade(String symbol, double price, long size, ZonedDateTime timest
 		ByteBuffer timeStampBuffer = bytes.slice(10 + symbolLength, 8);
 		timeStampBuffer.order(ByteOrder.LITTLE_ENDIAN);
 		long nanoSecondsSinceEpoch = timeStampBuffer.getLong();
-		long epochSecond = nanoSecondsSinceEpoch / 1000000000L;
-		long nanoOfSecond = nanoSecondsSinceEpoch % 1000000000L;
-	    ZoneId tz = ZoneId.of("America/New_York");
-	    ZoneRules rules = tz.getRules();
-        Instant instant = Instant.ofEpochSecond(epochSecond, (int)nanoOfSecond);
-        ZoneOffset offset = rules.getOffset(instant);
-        LocalDateTime ldt = LocalDateTime.ofEpochSecond(epochSecond, (int)nanoOfSecond, offset);
-        ZonedDateTime zdt = ZonedDateTime.ofLocal(ldt, tz, offset);
 		
 		ByteBuffer volumeBuffer = bytes.slice(18 + symbolLength, 4);
 		volumeBuffer.order(ByteOrder.LITTLE_ENDIAN);
 		long totalVolume = Integer.toUnsignedLong(volumeBuffer.getInt());
 		
-		return new Trade(symbol, price, size, zdt, totalVolume);
+		return new Trade(symbol, price, size, nanoSecondsSinceEpoch, totalVolume);
 	}
 	
 }

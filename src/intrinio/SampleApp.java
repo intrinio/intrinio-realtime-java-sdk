@@ -38,10 +38,11 @@ class TradeHandler implements OnTrade {
 	public void tryLog() {
 		if (maxTradeCount > 0) {
 			Client.Log("Most active trade symbol: %s (%d updates)", maxTrade.symbol(), maxTradeCount);
-			Client.Log("%s - Trade (price = %f, size = %d)",
+			Client.Log("%s - Trade (price = %f, size = %d, time = %s)",
 					maxTrade.symbol(),
 					maxTrade.price(),
-					maxTrade.size());
+					maxTrade.size(),
+					maxTrade.timestamp());
 		}
 	}
 }

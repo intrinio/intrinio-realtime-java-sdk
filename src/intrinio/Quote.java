@@ -16,7 +16,11 @@ enum QuoteType {
 	BID
 }
 
-public record Quote(QuoteType type, String symbol, double price, long size, ZonedDateTime timestamp) {
+/**
+ * A bid or ask quote. "timestamp" is in nanoseconds since unix epoch.
+ * @author Intrinio *
+ */
+public record Quote(QuoteType type, String symbol, double price, long size, long timestamp) {
 	
 	public String toString() {
 		String s =
@@ -52,16 +56,8 @@ public record Quote(QuoteType type, String symbol, double price, long size, Zone
 		ByteBuffer timeStampBuffer = ByteBuffer.wrap(bytes, 10 + symbolLength, 8);
 		timeStampBuffer.order(ByteOrder.LITTLE_ENDIAN);
 		long nanoSecondsSinceEpoch = timeStampBuffer.getLong();
-		long epochSecond = nanoSecondsSinceEpoch / 1000000000L;
-		long nanoOfSecond = nanoSecondsSinceEpoch % 1000000000L;
-	    ZoneId tz = ZoneId.of("America/New_York");
-	    ZoneRules rules = tz.getRules();
-        Instant instant = Instant.ofEpochSecond(epochSecond, (int)nanoOfSecond);
-        ZoneOffset offset = rules.getOffset(instant);
-        LocalDateTime ldt = LocalDateTime.ofEpochSecond(epochSecond, (int)nanoOfSecond, offset);
-        ZonedDateTime zdt = ZonedDateTime.ofLocal(ldt, tz, offset);
 		
-		return new Quote(type, symbol, price, size, zdt);
+		return new Quote(type, symbol, price, size, nanoSecondsSinceEpoch);
 	}
 	
 	public static Quote parse(ByteBuffer bytes, int symbolLength) {
@@ -86,16 +82,8 @@ public record Quote(QuoteType type, String symbol, double price, long size, Zone
 		ByteBuffer timeStampBuffer = bytes.slice(10 + symbolLength, 8);
 		timeStampBuffer.order(ByteOrder.LITTLE_ENDIAN);
 		long nanoSecondsSinceEpoch = timeStampBuffer.getLong();
-		long epochSecond = nanoSecondsSinceEpoch / 1000000000L;
-		long nanoOfSecond = nanoSecondsSinceEpoch % 1000000000L;
-	    ZoneId tz = ZoneId.of("America/New_York");
-	    ZoneRules rules = tz.getRules();
-        Instant instant = Instant.ofEpochSecond(epochSecond, (int)nanoOfSecond);
-        ZoneOffset offset = rules.getOffset(instant);
-        LocalDateTime ldt = LocalDateTime.ofEpochSecond(epochSecond, (int)nanoOfSecond, offset);
-        ZonedDateTime zdt = ZonedDateTime.ofLocal(ldt, tz, offset);
 		
-		return new Quote(type, symbol, price, size, zdt);
+		return new Quote(type, symbol, price, size, nanoSecondsSinceEpoch);
 	}
 	
 }

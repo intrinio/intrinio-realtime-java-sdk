@@ -165,20 +165,20 @@ Currently, Intrinio offers realtime data for this SDK from the following provide
 ### Trade Message
 
 ```java
-public record Trade(String symbol, double price, long size, ZonedDateTime timestamp, long totalVolume)
+public record Trade(String symbol, double price, long size, long timestamp, long totalVolume)
 ```
 
 * **symbol** - Ticker symbole.
 * **price** - the price in USD
 * **size** - the size of the last trade.
 * **totalVolume** - The number of stocks traded so far today for this symbol.
-* **timestamp** - a Unix timestamp
+* **timestamp** - a Unix timestamp in nanoseconds since unix epoch.
 
 
 ### Quote Message
 
 ```java
-public record Quote(QuoteType type, String symbol, double price, long size, ZonedDateTime timestamp)
+public record Quote(QuoteType type, String symbol, double price, long size, long timestamp)
 ```
 
 * **type** - the quote type
@@ -187,7 +187,7 @@ public record Quote(QuoteType type, String symbol, double price, long size, Zone
 * **symbol** - Ticker symbol.
 * **price** - the price in USD
 * **size** - the size of the last ask or bid).
-* **timestamp** - a Unix timestamp
+* **timestamp** - a Unix timestamp in nanoseconds since unix epoch.
 
 ## API Keys
 

@@ -1,5 +1,5 @@
 # intrinio-realtime-options-java-sdk
-SDK for working with Intrinio's realtime prices feed
+SDK for working with Intrinio's realtime Multi-Exchange prices feed.  Intrinio’s Multi-Exchange feed bridges the gap by merging real-time equity pricing from the IEX and MEMX exchanges. Get a comprehensive view with increased market volume and enjoy no exchange fees, no per-user requirements, no permissions or authorizations, and little to no paperwork.
 
 [Intrinio](https://intrinio.com/) provides real-time stock prices via a two-way WebSocket connection. To get started, [subscribe to a real-time data feed](https://intrinio.com/real-time-multi-exchange) and follow the instructions below.
 
@@ -45,14 +45,6 @@ public static void main(String[] args) {
 ## Handling Quotes
 
 There are thousands of securities, each with their own feed of activity.  We highly encourage you to make your trade and quote handlers has short as possible and follow a queue pattern so your app can handle the volume of activity.
-
-## Providers
-
-Currently, Intrinio offers realtime data for this SDK from the following providers:
-
-* IEX  - [Homepage](https://iex.io)
-* MEMX - [Homepage](https://memx.com)
-
 
 ## Data Format
 

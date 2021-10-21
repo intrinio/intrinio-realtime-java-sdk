@@ -106,7 +106,8 @@ public class SampleApp {
 			}
 		};
 		timer.schedule(task, 10000, 10000);
-		client.join();
+		client.join(); //Load symbols from config.json
+		//client.join(new String[] {"AAPL", "GOOG", "MSFT"}, false); //specify symbols at runtime
 	}
 
 }

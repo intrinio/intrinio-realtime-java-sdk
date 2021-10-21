@@ -15,13 +15,11 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -30,9 +28,6 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.ArrayList;
-
-import com.google.gson.Gson;
 
 class WebSocketState {
 	
@@ -403,9 +398,7 @@ public class Client implements WebSocket.Listener {
 		
 	public CompletionStage<Void> onText(WebSocket ws, CharSequence data, boolean isComplete) {
 		textMsgCount.addAndGet(1l);
-		Gson gson = new Gson();
-		ErrorMessage errorMessage = gson.fromJson(data.toString(), ErrorMessage.class);
-		Client.Log("Error received: %s", errorMessage.getPayload().getResponse());
+		Client.Log("Error received: %s", data.toString());
 		ws.request(1);
 		return null;
 	}

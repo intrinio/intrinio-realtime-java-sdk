@@ -28,3 +28,6 @@ Test.java
 settings.xml
 out
 .DS_Store
+
+# Eclipse IDE preferences files
+.settings/*.prefs

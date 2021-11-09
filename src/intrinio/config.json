@@ -1,0 +1,7 @@
+{
+	"apiKey": "",
+	"provider": "REALTIME",
+	"symbols": [ "GOOG", "MSFT", "AAPL" ],
+	"tradesOnly": false,
+	"numThreads": 2
+}

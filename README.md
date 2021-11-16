@@ -5,7 +5,7 @@ SDK for working with Intrinio's realtime Multi-Exchange prices feed.  Intrinioâ€
 
 ## Requirements
 
-- Java 7+
+- Java 14+
 
 ## Installation
 

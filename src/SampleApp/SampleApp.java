@@ -1,8 +1,9 @@
-package intrinio;
+package SampleApp;
 
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
+import intrinio.*;
 
 class TradeHandler implements OnTrade {
 	private final ConcurrentHashMap<String,Integer> symbols = new ConcurrentHashMap<String,Integer>();
@@ -96,6 +97,9 @@ public class SampleApp {
 		Client.Log("Starting sample app");
 		TradeHandler tradeHandler = new TradeHandler();
 		QuoteHandler quoteHandler = new QuoteHandler();
+		//Config config = null; //You can either create a config class, or load it from the intrinio/config.json file
+		//try { config = new Config("apiKeyHere", Provider.REALTIME, null, null, false, 2); } catch (Exception e) {e.printStackTrace();}		
+		//Client client = new Client(tradeHandler, quoteHandler, config);
 		Client client = new Client(tradeHandler, quoteHandler);
 		Timer timer = new Timer();
 		TimerTask task = new TimerTask() {
@@ -106,7 +110,7 @@ public class SampleApp {
 			}
 		};
 		timer.schedule(task, 10000, 10000);
-		client.join(); //Load symbols from config.json
+		client.join(); //Loads symbols from config
 		//client.join(new String[] {"AAPL", "GOOG", "MSFT"}, false); //specify symbols at runtime
 	}
 

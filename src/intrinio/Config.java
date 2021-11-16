@@ -17,13 +17,23 @@ public class Config {
 	private boolean tradesOnly = true;
 	private int numThreads = 4;
 	
-	public Config(String apiKey, Provider provider, String ipAddress, String[] symbols, boolean tradesOnly, int numThreads) {
+	public Config(String apiKey, Provider provider, String ipAddress, String[] symbols, boolean tradesOnly, int numThreads) throws Exception {
 		this.apiKey = apiKey;
 		this.provider = provider;
 		this.ipAddress = ipAddress;
 		this.symbols = symbols;
 		this.tradesOnly = tradesOnly;
 		this.numThreads = numThreads;
+		
+		if (this.apiKey.isBlank()) {
+			throw new Exception("You must provide a valid API key");
+		}
+		if (this.provider == Provider.NONE) {
+			throw new Exception("You must specify a valid provider");
+		}
+		if ((this.provider == Provider.MANUAL) && this.ipAddress.isBlank()) {
+			throw new Exception("You must specify an IP address for manual configuration");
+		}
 	}
 	
 	public String getApiKey() {
@@ -68,15 +78,6 @@ public class Config {
 			Gson gson = new Gson();
 			Config config = gson.fromJson(reader, Config.class);
 			System.out.println(config);
-			if (config.apiKey.isBlank()) {
-				throw new Exception("You must provide a valid API key");
-			}
-			if (config.provider == Provider.NONE) {
-				throw new Exception("You must specify a valid provider");
-			}
-			if ((config.provider == Provider.MANUAL) && config.ipAddress.isBlank()) {
-				throw new Exception("You must specify an IP address for manual configuration");
-			}
 			return config;
 		} catch (Exception e) {
 			return null;

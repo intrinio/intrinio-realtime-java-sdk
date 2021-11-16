@@ -4,12 +4,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 
-enum QuoteType {
-	INVALID,
-	ASK,
-	BID
-}
-
 /**
  * A bid or ask quote. "timestamp" is in nanoseconds since unix epoch.
  * @author Intrinio *

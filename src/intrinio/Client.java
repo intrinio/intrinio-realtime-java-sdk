@@ -76,14 +76,6 @@ record Token (String token, LocalDateTime date) {}
 
 record Channel (String symbol, boolean tradesOnly) {}
 
-interface OnTrade {
-	void onTrade(Trade trade);
-}
-
-interface OnQuote {
-	void onQuote(Quote quote);
-}
-
 public class Client implements WebSocket.Listener {
 	private final long[] selfHealBackoffs = {1000, 30000, 60000, 300000, 600000};
 	private final ReentrantReadWriteLock tLock = new ReentrantReadWriteLock();

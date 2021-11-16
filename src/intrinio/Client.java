@@ -76,19 +76,11 @@ record Token (String token, LocalDateTime date) {}
 
 record Channel (String symbol, boolean tradesOnly) {}
 
-interface OnTrade {
-	void onTrade(Trade trade);
-}
-
-interface OnQuote {
-	void onQuote(Quote quote);
-}
-
 public class Client implements WebSocket.Listener {
 	private final long[] selfHealBackoffs = {1000, 30000, 60000, 300000, 600000};
 	private final ReentrantReadWriteLock tLock = new ReentrantReadWriteLock();
 	private final ReentrantReadWriteLock wsLock = new ReentrantReadWriteLock();
-	private final Config config = Config.load();
+	private Config config;
 	private final LinkedBlockingDeque<byte[]> data = new LinkedBlockingDeque<>();
 	
 	private AtomicReference<Token> token = new AtomicReference<Token>(new Token(null, LocalDateTime.now()));
@@ -100,7 +92,7 @@ public class Client implements WebSocket.Listener {
 	private Lock dataBucketLock;
 	private OnTrade onTrade = (Trade trade) -> {};
 	private OnQuote onQuote = (Quote quote) -> {};
-	private Thread[] threads = new Thread[config.getNumThreads()];	
+	private Thread[] threads;	
 	private boolean isCancellationRequested = false;
 	
 	private class Tuple<X, Y> { 
@@ -577,6 +569,22 @@ public class Client implements WebSocket.Listener {
 		
 	public Client() {
 		try {
+			config = Config.load();
+			threads = new Thread[config.getNumThreads()];
+			dataBucketLock = new ReentrantLock();
+			dataBucket = new LinkedBlockingDeque<Tuple<byte[], Boolean>>();
+			this.initializeThreads();
+		} catch (Exception e) {
+			Client.Log("Initialization Failure. " + e.getMessage());
+		}
+		String token = this.getToken();
+		this.initializeWebSocket(token);
+	}
+	
+	public Client(Config config) {
+		try {
+			this.config = config;
+			threads = new Thread[config.getNumThreads()];
 			dataBucketLock = new ReentrantLock();
 			dataBucket = new LinkedBlockingDeque<Tuple<byte[], Boolean>>();
 			this.initializeThreads();
@@ -594,6 +602,17 @@ public class Client implements WebSocket.Listener {
 		
 	public Client(OnTrade onTrade, OnQuote onQuote){
 		this();
+		this.onTrade = onTrade;
+		this.onQuote = onQuote;
+	}
+	
+	public Client(OnTrade onTrade, Config config){
+		this(config);
+		this.onTrade = onTrade;
+	}
+		
+	public Client(OnTrade onTrade, OnQuote onQuote, Config config){
+		this(config);
 		this.onTrade = onTrade;
 		this.onQuote = onQuote;
 	}

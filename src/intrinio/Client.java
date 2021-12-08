@@ -108,7 +108,7 @@ public class Client implements WebSocket.Listener {
 		while (!this.isCancellationRequested) {
 			try {
 				Thread.sleep(20000);
-				Client.Log("Sending heartbeat");
+				//Client.Log("Sending heartbeat");
 				wsLock.readLock().lock();
 				try {
 					if (wsState.isReady()) {
@@ -270,6 +270,7 @@ public class Client implements WebSocket.Listener {
 		HttpURLConnection con;
 		try {
 			con = (HttpURLConnection) url.openConnection();
+			con.setRequestProperty("Client-Information", "IntrinioRealtimeJavaSDKv3.1");
 		} catch (IOException e) {
 			Client.Log("Authorization Failure. Please check your network connection. " + e.getMessage());
 			return false;

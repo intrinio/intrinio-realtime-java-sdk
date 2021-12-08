@@ -77,7 +77,6 @@ public class Config {
 			Reader reader = new InputStreamReader(inputStream);
 			Gson gson = new Gson();
 			Config config = gson.fromJson(reader, Config.class);
-			System.out.println(config);
 			return config;
 		} catch (Exception e) {
 			return null;

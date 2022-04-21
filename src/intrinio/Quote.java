@@ -35,7 +35,7 @@ public record Quote(QuoteType type, String symbol, double price, long size, long
 		
 		ByteBuffer priceBuffer = ByteBuffer.wrap(bytes, 2 + symbolLength, 4);
 		priceBuffer.order(ByteOrder.LITTLE_ENDIAN);
-		double price = priceBuffer.getInt() / 10000.0;
+		double price = priceBuffer.getFloat();
 		
 		ByteBuffer sizeBuffer = ByteBuffer.wrap(bytes, 6 + symbolLength, 4);
 		sizeBuffer.order(ByteOrder.LITTLE_ENDIAN);
@@ -61,7 +61,7 @@ public record Quote(QuoteType type, String symbol, double price, long size, long
 		
 		ByteBuffer priceBuffer = bytes.slice(2 + symbolLength, 4);
 		priceBuffer.order(ByteOrder.LITTLE_ENDIAN);
-		double price = priceBuffer.getInt() / 10000.0;
+		double price = priceBuffer.getFloat();
 		
 		ByteBuffer sizeBuffer = bytes.slice(6 + symbolLength, 4);
 		sizeBuffer.order(ByteOrder.LITTLE_ENDIAN);

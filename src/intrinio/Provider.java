@@ -3,5 +3,6 @@ package intrinio;
 public enum Provider {
 	NONE,
 	REALTIME,
-	MANUAL
+	MANUAL,
+	DELAYED_SIP
 }

@@ -218,6 +218,8 @@ public class Client implements WebSocket.Listener {
 		switch (config.getProvider()) {
 		case REALTIME: authUrl = "https://realtime-mx.intrinio.com/auth?api_key=" + config.getApiKey();
 			break;
+		case DELAYED_SIP: authUrl = "https://realtime-delayed-sip.intrinio.com/auth?api_key=" + config.getApiKey();
+			break;
 		case MANUAL: authUrl = "http://" + config.getIpAddress() + "/auth?api_key=" + config.getApiKey();
 			break;
 		default: throw new Exception("Provider not specified!");
@@ -229,6 +231,8 @@ public class Client implements WebSocket.Listener {
 		String wsUrl;
 		switch (config.getProvider()) {
 		case REALTIME: wsUrl = "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
+			break;
+		case DELAYED_SIP: wsUrl = "wss://realtime-delayed-sip.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
 			break;
 		case MANUAL: wsUrl = "ws://" + config.getIpAddress() + "/socket/websocket?vsn=1.0.0&token=" + token;
 			break;
@@ -270,7 +274,7 @@ public class Client implements WebSocket.Listener {
 		HttpURLConnection con;
 		try {
 			con = (HttpURLConnection) url.openConnection();
-			con.setRequestProperty("Client-Information", "IntrinioRealtimeJavaSDKv4.0");
+			con.setRequestProperty("Client-Information", "IntrinioRealtimeJavaSDKv4.1");
 		} catch (IOException e) {
 			Client.Log("Authorization Failure. Please check your network connection. " + e.getMessage());
 			return false;

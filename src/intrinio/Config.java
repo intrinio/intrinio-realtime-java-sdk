@@ -73,7 +73,7 @@ public class Config {
 	public static Config load() {
 		System.out.println("Loading application configuration");
 		try {
-			InputStream inputStream = ClassLoader.getSystemResourceAsStream(Config.filename);
+			InputStream inputStream = Thread.currentThread().getContextClassLoader().getResourceAsStream(Config.filename);
 			Reader reader = new InputStreamReader(inputStream);
 			Gson gson = new Gson();
 			Config config = gson.fromJson(reader, Config.class);

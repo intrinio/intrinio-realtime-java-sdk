@@ -101,6 +101,12 @@ public class SampleApp {
 		//try { config = new Config("apiKeyHere", Provider.REALTIME, null, null, false, 2); } catch (Exception e) {e.printStackTrace();}		
 		//Client client = new Client(tradeHandler, quoteHandler, config);
 		Client client = new Client(tradeHandler, quoteHandler);
+		try{
+			client.start();
+		}catch (Exception e) {
+			e.printStackTrace();
+		}
+
 		Timer timer = new Timer();
 		TimerTask task = new TimerTask() {
 			public void run() {
@@ -113,5 +119,4 @@ public class SampleApp {
 		client.join(); //Loads symbols from config
 		//client.join(new String[] {"AAPL", "GOOG", "MSFT"}, false); //specify symbols at runtime
 	}
-
 }

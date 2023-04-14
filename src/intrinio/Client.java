@@ -118,6 +118,8 @@ public class Client implements WebSocket.Listener {
 				break;
 			case DELAYED_SIP: authUrl = "https://realtime-delayed-sip.intrinio.com/auth?api_key=" + config.getApiKey();
 				break;
+			case NASDAQ_BASIC: authUrl = "https://realtime-nasdaq-basic.intrinio.com/auth?api_key=" + config.getApiKey();
+				break;
 			case MANUAL: authUrl = "http://" + config.getIpAddress() + "/auth?api_key=" + config.getApiKey();
 				break;
 			default: throw new Exception("Provider not specified!");
@@ -131,6 +133,8 @@ public class Client implements WebSocket.Listener {
 			case REALTIME: wsUrl = "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
 				break;
 			case DELAYED_SIP: wsUrl = "wss://realtime-delayed-sip.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
+				break;
+			case NASDAQ_BASIC: wsUrl = "wss://realtime-nasdaq-basic.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
 				break;
 			case MANUAL: wsUrl = "ws://" + config.getIpAddress() + "/socket/websocket?vsn=1.0.0&token=" + token;
 				break;

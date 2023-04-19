@@ -101,6 +101,23 @@ public class SampleApp {
 		//try { config = new Config("apiKeyHere", Provider.REALTIME, null, null, false, 2); } catch (Exception e) {e.printStackTrace();}		
 		//Client client = new Client(tradeHandler, quoteHandler, config);
 		Client client = new Client(tradeHandler, quoteHandler);
+
+		Runtime.getRuntime().addShutdownHook(new Thread( new Runnable() {
+			public void run() {
+				client.leave();
+				Client.Log("Stopping sample app");
+				client.stop();
+			}
+		}));
+
+		try{
+			client.start();
+			client.join(); //Loads symbols from config
+			//client.join(new String[] {"AAPL", "GOOG", "MSFT"}, false); //specify symbols at runtime
+		}catch (Exception e) {
+			e.printStackTrace();
+		}
+
 		Timer timer = new Timer();
 		TimerTask task = new TimerTask() {
 			public void run() {
@@ -109,9 +126,6 @@ public class SampleApp {
 				quoteHandler.tryLog();
 			}
 		};
-		timer.schedule(task, 10000, 10000);
-		client.join(); //Loads symbols from config
-		//client.join(new String[] {"AAPL", "GOOG", "MSFT"}, false); //specify symbols at runtime
+		timer.schedule(task, 300000, 300000);
 	}
-
 }

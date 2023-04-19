@@ -4,5 +4,6 @@ public enum Provider {
 	NONE,
 	REALTIME,
 	MANUAL,
-	DELAYED_SIP
+	DELAYED_SIP,
+	NASDAQ_BASIC
 }

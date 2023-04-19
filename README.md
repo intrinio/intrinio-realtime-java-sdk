@@ -118,7 +118,7 @@ client.leave()
 ```json
 {
 	"apiKey": "",
-	"provider": "REALTIME", //or DELAYED_SIP
+	"provider": "REALTIME", //or DELAYED_SIP or NASDAQ_BASIC or MANUAL
 	"symbols": [ "AAPL", "MSFT", "GOOG" ], //This is a list of individual tickers to subscribe to, or "lobby" to subscribe to all at once (firehose).
 	"tradesOnly": true, //This indicates whether you only want trade events (true) or you want trade, ask, and bid events (false).
 	"numThreads": 4 //The number of threads to use for processing events.

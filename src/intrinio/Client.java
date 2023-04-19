@@ -184,7 +184,7 @@ public class Client implements WebSocket.Listener {
 		try {
 			Client.Log("Websocket - Error - %s", err.getMessage());
 			ws.request(1);
-			if (err.getMessage() == "Connection reset"){
+			if (err.getMessage() == "Operation timed out"){
 				onClose(ws, 1000, "Websocket - Error");
 			}
 		}
@@ -414,6 +414,7 @@ public class Client implements WebSocket.Listener {
 				//Client.Log("Websocket - Heartbeat Interrupted  - %s", e.getMessage());
 			} catch (Exception e) {
 				Client.Log("Websocket - Heartbeat Error - %s", e.getMessage());
+				this.onClose(this.wsState.getWebSocket(), 1000, "Heartbeat error");
 			}
 		}
 	}

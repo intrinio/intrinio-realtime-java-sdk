@@ -355,34 +355,28 @@ public class Client implements WebSocket.Listener {
 	//region Private Methods
 	private void processData(){
 		while (!this.isCancellationRequested) {
-			int count, offset, symbolLength;
+			int count, startIndex, len;
 			byte type;
-			ByteBuffer buffer, offsetBuffer;
+			//ByteBuffer buffer, offsetBuffer;
 			try {
 				byte[] datum = data.poll(1, TimeUnit.SECONDS);
 				if (datum != null) {
 					count = datum[0];
-					offset = 1;
-					buffer = ByteBuffer.wrap(datum);
-					buffer.position(0);
-					buffer.limit(datum.length);
-					for (long i = 0L; i < count; i++) {
-						buffer.position(0);
-						type = datum[offset];
-						symbolLength = datum[offset + 1];
+					startIndex = 1;
+					for (int i = 0; i < count; i++) {
+						type = datum[startIndex];
+						len = datum[startIndex+1];
 						switch (type) {
 							case 0:
-								offsetBuffer = buffer.slice(offset, 22 + symbolLength);
-								Trade trade = Trade.parse(offsetBuffer, symbolLength);
+								Trade trade = Trade.parse(datum, startIndex);
 								onTrade.onTrade(trade);
-								offset += 22 + symbolLength;
+								startIndex = startIndex + len;
 								break;
 							case 1:
 							case 2:
-								offsetBuffer = buffer.slice(offset, 18 + symbolLength);
-								Quote quote = Quote.parse(offsetBuffer, symbolLength);
+								Quote quote = Quote.parse(datum, startIndex);
 								onQuote.onQuote(quote);
-								offset += 18 + symbolLength;
+								startIndex = startIndex + len;
 								break;
 							default:
 								Client.Log("Error parsing multi-part message. Type is %d", type);
@@ -480,7 +474,6 @@ public class Client implements WebSocket.Listener {
 		wsLock.writeLock().lock();
 		try {
 			Client.Log("Websocket - Connecting...");
-			WebSocketState wsState = new WebSocketState();
 			String wsUrl;
 			try {
 				wsUrl = this.getWebSocketUrl(token);
@@ -496,7 +489,10 @@ public class Client implements WebSocket.Listener {
 				return;
 			}
 			HttpClient httpClient = HttpClient.newHttpClient();
-			CompletableFuture<WebSocket> task = httpClient.newWebSocketBuilder().buildAsync(uri, (WebSocket.Listener) this);
+			CompletableFuture<WebSocket> task =
+				httpClient.newWebSocketBuilder()
+				.header("UseNewEquitiesFormat", "v2")
+				.buildAsync(uri, (WebSocket.Listener) this);
 			try {
 				WebSocket ws = task.get();
 				this.wsState.setWebSocket(ws);

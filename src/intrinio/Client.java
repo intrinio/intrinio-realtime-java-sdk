@@ -50,7 +50,6 @@ public class Client implements WebSocket.Listener {
 	private OnTrade onTrade = (Trade trade) -> {};
 	private OnQuote onQuote = (Quote quote) -> {};
 	private Thread[] processDataThreads;
-	private Thread heartbeatThread;
 	private boolean isCancellationRequested = false;
 	//endregion Data Members
 
@@ -114,7 +113,7 @@ public class Client implements WebSocket.Listener {
 	private String getAuthUrl() throws Exception {
 		String authUrl;
 		switch (config.getProvider()) {
-			case REALTIME: authUrl = "https://realtime-mx.intrinio.com/auth?api_key=" + config.getApiKey();
+			case IEX: authUrl = "https://realtime-mx.intrinio.com/auth?api_key=" + config.getApiKey();
 				break;
 			case DELAYED_SIP: authUrl = "https://realtime-delayed-sip.intrinio.com/auth?api_key=" + config.getApiKey();
 				break;
@@ -130,7 +129,7 @@ public class Client implements WebSocket.Listener {
 	private String getWebSocketUrl (String token) throws Exception {
 		String wsUrl;
 		switch (config.getProvider()) {
-			case REALTIME: wsUrl = "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
+			case IEX: wsUrl = "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
 				break;
 			case DELAYED_SIP: wsUrl = "wss://realtime-delayed-sip.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
 				break;
@@ -391,35 +390,11 @@ public class Client implements WebSocket.Listener {
 		}
 	}
 
-	public void heartbeat(){
-		while (!this.isCancellationRequested) {
-			try {
-				Thread.sleep(20000);
-				//Client.Log("Sending heartbeat");
-				wsLock.readLock().lock();
-				try {
-					if (wsState.isReady()) {
-						wsState.getWebSocket().sendBinary(ByteBuffer.wrap(new byte[] {}), true).join();
-					}
-				} finally {
-					wsLock.readLock().unlock();
-				}
-			} catch (InterruptedException e) {
-				//Client.Log("Websocket - Heartbeat Interrupted  - %s", e.getMessage());
-			} catch (Exception e) {
-				Client.Log("Websocket - Heartbeat Error - %s", e.getMessage());
-				this.onClose(this.wsState.getWebSocket(), 1000, "Heartbeat error");
-			}
-		}
-	}
-
 	private void startThreads() throws Exception{
 		this.isCancellationRequested = false;
-		this.heartbeatThread = new Thread(() -> heartbeat());
 		for (int i = 0; i < processDataThreads.length; i++) {
 			processDataThreads[i] = new Thread(()->processData());
 		}
-		heartbeatThread.start();
 		for (Thread thread : processDataThreads) {
 			thread.start();
 		}
@@ -430,11 +405,6 @@ public class Client implements WebSocket.Listener {
 		try {
 			Thread.sleep(1000);
 		}catch (Exception e){}
-
-		try {
-			this.heartbeatThread.join();
-		}catch (Exception e){}
-
 		for (Thread thread : processDataThreads) {
 			try {
 				thread.join();
@@ -492,6 +462,7 @@ public class Client implements WebSocket.Listener {
 			CompletableFuture<WebSocket> task =
 				httpClient.newWebSocketBuilder()
 				.header("UseNewEquitiesFormat", "v2")
+				.header("Client-Information", "IntrinioRealtimeJavaSDKv6.0")
 				.buildAsync(uri, (WebSocket.Listener) this);
 			try {
 				WebSocket ws = task.get();

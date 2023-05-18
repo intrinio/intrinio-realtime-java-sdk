@@ -1,6 +1,6 @@
 {
 	"apiKey": "",
-	"provider": "REALTIME",
+	"provider": "IEX",
 	"symbols": [ "GOOG", "MSFT", "AAPL" ],
 	"tradesOnly": false,
 	"numThreads": 2

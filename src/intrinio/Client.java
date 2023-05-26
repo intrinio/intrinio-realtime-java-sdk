@@ -50,8 +50,11 @@ public class Client implements WebSocket.Listener {
 	private OnTrade onTrade = (Trade trade) -> {};
 	private OnQuote onQuote = (Quote quote) -> {};
 	private Thread[] processDataThreads;
-	private Thread heartbeatThread;
 	private boolean isCancellationRequested = false;
+	private String HeaderClientInformationKey = "Client-Information";
+	private String HeaderClientInformationValue = "IntrinioRealtimeJavaSDKv6.0";
+	private String HeaderMessageVersionKey = "UseNewEquitiesFormat";
+	private String HeaderMessageVersionValue = "v2";
 	//endregion Data Members
 
 	//region Constructors
@@ -355,7 +358,7 @@ public class Client implements WebSocket.Listener {
 	//region Private Methods
 	private void processData(){
 		while (!this.isCancellationRequested) {
-			int count, offset, symbolLength;
+			int count, offset, messageLength;
 			byte type;
 			ByteBuffer buffer, offsetBuffer;
 			try {
@@ -369,25 +372,23 @@ public class Client implements WebSocket.Listener {
 					for (long i = 0L; i < count; i++) {
 						buffer.position(0);
 						type = datum[offset];
-						symbolLength = datum[offset + 1];
+						messageLength = datum[offset + 1];
+						offsetBuffer = buffer.slice(offset, messageLength);
 						switch (type) {
 							case 0:
-								offsetBuffer = buffer.slice(offset, 22 + symbolLength);
-								Trade trade = Trade.parse(offsetBuffer, symbolLength);
+								Trade trade = Trade.parse(offsetBuffer);
 								onTrade.onTrade(trade);
-								offset += 22 + symbolLength;
 								break;
 							case 1:
 							case 2:
-								offsetBuffer = buffer.slice(offset, 18 + symbolLength);
-								Quote quote = Quote.parse(offsetBuffer, symbolLength);
+								Quote quote = Quote.parse(offsetBuffer);
 								onQuote.onQuote(quote);
-								offset += 18 + symbolLength;
 								break;
 							default:
 								Client.Log("Error parsing multi-part message. Type is %d", type);
 								i = count;
 						}
+						offset += messageLength;
 					}
 				}
 			} catch (Exception ex)
@@ -397,35 +398,11 @@ public class Client implements WebSocket.Listener {
 		}
 	}
 
-	public void heartbeat(){
-		while (!this.isCancellationRequested) {
-			try {
-				Thread.sleep(20000);
-				//Client.Log("Sending heartbeat");
-				wsLock.readLock().lock();
-				try {
-					if (wsState.isReady()) {
-						wsState.getWebSocket().sendBinary(ByteBuffer.wrap(new byte[] {}), true).join();
-					}
-				} finally {
-					wsLock.readLock().unlock();
-				}
-			} catch (InterruptedException e) {
-				//Client.Log("Websocket - Heartbeat Interrupted  - %s", e.getMessage());
-			} catch (Exception e) {
-				Client.Log("Websocket - Heartbeat Error - %s", e.getMessage());
-				this.onClose(this.wsState.getWebSocket(), 1000, "Heartbeat error");
-			}
-		}
-	}
-
 	private void startThreads() throws Exception{
 		this.isCancellationRequested = false;
-		this.heartbeatThread = new Thread(() -> heartbeat());
 		for (int i = 0; i < processDataThreads.length; i++) {
 			processDataThreads[i] = new Thread(()->processData());
 		}
-		heartbeatThread.start();
 		for (Thread thread : processDataThreads) {
 			thread.start();
 		}
@@ -436,11 +413,6 @@ public class Client implements WebSocket.Listener {
 		try {
 			Thread.sleep(1000);
 		}catch (Exception e){}
-
-		try {
-			this.heartbeatThread.join();
-		}catch (Exception e){}
-
 		for (Thread thread : processDataThreads) {
 			try {
 				thread.join();
@@ -496,7 +468,11 @@ public class Client implements WebSocket.Listener {
 				return;
 			}
 			HttpClient httpClient = HttpClient.newHttpClient();
-			CompletableFuture<WebSocket> task = httpClient.newWebSocketBuilder().buildAsync(uri, (WebSocket.Listener) this);
+			CompletableFuture<WebSocket> task =
+				httpClient.newWebSocketBuilder()
+				.header(HeaderMessageVersionKey, HeaderMessageVersionValue)
+				.header(HeaderClientInformationKey, HeaderClientInformationValue)
+				.buildAsync(uri, (WebSocket.Listener) this);
 			try {
 				WebSocket ws = task.get();
 				this.wsState.setWebSocket(ws);
@@ -574,7 +550,7 @@ public class Client implements WebSocket.Listener {
 		HttpURLConnection con;
 		try {
 			con = (HttpURLConnection) url.openConnection();
-			con.setRequestProperty("Client-Information", "IntrinioRealtimeJavaSDKv5.0");
+			con.setRequestProperty(HeaderClientInformationKey, HeaderClientInformationValue);
 		} catch (IOException e) {
 			Client.Log("Authorization Failure. Please check your network connection. " + e.getMessage());
 			return false;

@@ -126,6 +126,6 @@ public class SampleApp {
 				quoteHandler.tryLog();
 			}
 		};
-		timer.schedule(task, 300000, 300000);
+		timer.schedule(task, 30000, 30000);
 	}
 }

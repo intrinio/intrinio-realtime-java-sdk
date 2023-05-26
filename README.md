@@ -58,29 +58,49 @@ There are thousands of securities, each with their own feed of activity.  We hig
 ### Trade Message
 
 ```java
-public record Trade(String symbol, double price, long size, long timestamp, long totalVolume)
+public record Trade(String symbol, SubProvider subProvider, char marketCenter, double price, long size, long timestamp, long totalVolume, String conditions)
 ```
 
 * **symbol** - Ticker symbole.
+* **subProvider** - Denotes the detailed source within grouped sources.
+  *    **`NONE`** - No subtype specified.
+  *    **`CTA_A`** - CTA_A in the DELAYED_SIP provider.
+  *    **`CTA_B`** - CTA_B in the DELAYED_SIP provider.
+  *    **`UTP`** - UTP in the DELAYED_SIP provider.
+  *    **`OTC`** - OTC in the DELAYED_SIP provider.
+  *    **`NASDAQ_BASIC`** - NASDAQ Basic in the NASDAQ_BASIC provider.
+  *    **`IEX`** - From the IEX exchange in the REALTIME provider.
+* **marketCenter** - Provides the market center
 * **price** - the price in USD
 * **size** - the size of the last trade.
 * **totalVolume** - The number of stocks traded so far today for this symbol.
 * **timestamp** - a Unix timestamp in nanoseconds since unix epoch.
+* **conditions** - Provides the conditions
 
 
 ### Quote Message
 
 ```java
-public record Quote(QuoteType type, String symbol, double price, long size, long timestamp)
+public record Quote(QuoteType type, String symbol, SubProvider subProvider, char marketCenter, double price, long size, long timestamp, String conditions)
 ```
 
 * **type** - the quote type
   *    **`ask`** - represents an ask type
   *    **`bid`** - represents a bid type  
+* **subProvider** - Denotes the detailed source within grouped sources.
+  *    **`NONE`** - No subtype specified.
+  *    **`CTA_A`** - CTA_A in the DELAYED_SIP provider.
+  *    **`CTA_B`** - CTA_B in the DELAYED_SIP provider.
+  *    **`UTP`** - UTP in the DELAYED_SIP provider.
+  *    **`OTC`** - OTC in the DELAYED_SIP provider.
+  *    **`NASDAQ_BASIC`** - NASDAQ Basic in the NASDAQ_BASIC provider.
+  *    **`IEX`** - From the IEX exchange in the REALTIME provider.
+* **marketCenter** - Provides the market center
 * **symbol** - Ticker symbol.
 * **price** - the price in USD
 * **size** - the size of the last ask or bid).
 * **timestamp** - a Unix timestamp in nanoseconds since unix epoch.
+* **conditions** - Provides the conditions
 
 ## API Keys
 

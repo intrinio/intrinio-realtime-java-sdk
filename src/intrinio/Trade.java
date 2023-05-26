@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
  */
 public record Trade
 	(String symbol,
-	 byte source,
+	 SubProvider subProvider,
 	 char marketCenter,
 	 double price,
 	 long size,
@@ -19,10 +19,10 @@ public record Trade
 	 String conditions) {
 	
 	public String toString() {
-		String s =
+		return
 			"Trade (" +
 			"Symbol: " + this.symbol +
-			", Source: " + this.source +
+			", SubProvider: " + this.subProvider +
 			", MarketCenter: " + this.marketCenter +
 			", Price: " + this.price +
 			", Size: " + this.size +
@@ -30,45 +30,110 @@ public record Trade
 			", Timestamp: " + this.timestamp +
 			", Conditions: " + this.conditions +
 			")";
-		return s;
 	}
 	
-	public static Trade parse(byte[] bytes, int startOffset) {
-		
-		byte symbolLen = bytes[startOffset + 2];
-		
-		String symbol = StandardCharsets.US_ASCII.decode(ByteBuffer.wrap(bytes, startOffset + 3, symbolLen)).toString();
-		
-		byte source = bytes[startOffset + 3 + symbolLen];
-		
-		ByteBuffer marketCenterBuffer = ByteBuffer.wrap(bytes, startOffset + 4 + symbolLen, 2);
-		marketCenterBuffer.order(ByteOrder.LITTLE_ENDIAN);
-		char marketCenter = marketCenterBuffer.getChar();
-		
-		ByteBuffer priceBuffer = ByteBuffer.wrap(bytes, startOffset + 6 + symbolLen, 4);
-		priceBuffer.order(ByteOrder.LITTLE_ENDIAN);
-		double price = priceBuffer.getFloat();
-		
-		ByteBuffer sizeBuffer = ByteBuffer.wrap(bytes, startOffset + 10 + symbolLen, 4);
-		sizeBuffer.order(ByteOrder.LITTLE_ENDIAN);
-		long size = Integer.toUnsignedLong(sizeBuffer.getInt());
-		
-		ByteBuffer timeStampBuffer = ByteBuffer.wrap(bytes, startOffset + 14 + symbolLen, 8);
-		timeStampBuffer.order(ByteOrder.LITTLE_ENDIAN);
-		long nanoSecondsSinceEpoch = timeStampBuffer.getLong();
-		
-		ByteBuffer volumeBuffer = ByteBuffer.wrap(bytes, startOffset + 22 + symbolLen, 4);
-		volumeBuffer.order(ByteOrder.LITTLE_ENDIAN);
-		long totalVolume = Integer.toUnsignedLong(volumeBuffer.getInt());
-		
-		byte conditionsLen = bytes[startOffset + 26 + symbolLen];
-		
-		String conditions = null;
-		if (conditionsLen > 0) {
-			conditions = StandardCharsets.US_ASCII.decode(ByteBuffer.wrap(bytes, startOffset + 27 + symbolLen, conditionsLen)).toString();
+	public static Trade parse(byte[] bytes) {
+		int symbolLength = bytes[2];
+		int conditionLength = bytes[26 + symbolLength];
+		String symbol = StandardCharsets.US_ASCII.decode(ByteBuffer.wrap(bytes, 3, symbolLength)).toString();
+
+		SubProvider subProvider;
+		switch (bytes[3 + symbolLength]) {
+			case 0: subProvider = SubProvider.NONE;
+				break;
+			case 1: subProvider = SubProvider.CTA_A;
+				break;
+			case 2: subProvider = SubProvider.CTA_B;
+				break;
+			case 3: subProvider = SubProvider.UTP;
+				break;
+			case 4: subProvider = SubProvider.OTC;
+				break;
+			case 5: subProvider = SubProvider.NASDAQ_BASIC;
+				break;
+			case 6: subProvider = SubProvider.IEX;
+				break;
+			default: subProvider = SubProvider.IEX;
 		}
 
-		return new Trade(symbol, source, marketCenter, price, size, nanoSecondsSinceEpoch, totalVolume, conditions);
+		ByteBuffer priceBuffer = ByteBuffer.wrap(bytes, 6 + symbolLength, 4);
+		priceBuffer.order(ByteOrder.LITTLE_ENDIAN);
+		double price = priceBuffer.getFloat();
+
+		ByteBuffer sizeBuffer = ByteBuffer.wrap(bytes, 10 + symbolLength, 4);
+		sizeBuffer.order(ByteOrder.LITTLE_ENDIAN);
+		long size = Integer.toUnsignedLong(sizeBuffer.getInt());
+
+		ByteBuffer timeStampBuffer = ByteBuffer.wrap(bytes, 14 + symbolLength, 8);
+		timeStampBuffer.order(ByteOrder.LITTLE_ENDIAN);
+		long nanoSecondsSinceEpoch = timeStampBuffer.getLong();
+
+		ByteBuffer volumeBuffer = ByteBuffer.wrap(bytes, 22 + symbolLength, 4);
+		volumeBuffer.order(ByteOrder.LITTLE_ENDIAN);
+		long totalVolume = Integer.toUnsignedLong(volumeBuffer.getInt());
+
+		ByteBuffer marketCenterBuffer = ByteBuffer.wrap(bytes, 4 + symbolLength, 2);
+		marketCenterBuffer.order(ByteOrder.LITTLE_ENDIAN);
+		char marketCenter = marketCenterBuffer.getChar();
+
+		String condition = "";
+		if (conditionLength > 0) {
+			condition = StandardCharsets.US_ASCII.decode(ByteBuffer.wrap(bytes, 27 + symbolLength, conditionLength)).toString();
+		}
+
+		return new Trade(symbol, subProvider, marketCenter, price, size, nanoSecondsSinceEpoch, totalVolume, condition);
+	}
+
+	public static Trade parse(ByteBuffer bytes) {
+		int symbolLength = bytes.get(2);
+		int conditionLength = bytes.get(26 + symbolLength);
+		String symbol = StandardCharsets.US_ASCII.decode(bytes.slice(3, symbolLength)).toString();
+
+		SubProvider source;
+		switch (bytes.get(3 + symbolLength)) {
+			case 0: source = SubProvider.NONE;
+				break;
+			case 1: source = SubProvider.CTA_A;
+				break;
+			case 2: source = SubProvider.CTA_B;
+				break;
+			case 3: source = SubProvider.UTP;
+				break;
+			case 4: source = SubProvider.OTC;
+				break;
+			case 5: source = SubProvider.NASDAQ_BASIC;
+				break;
+			case 6: source = SubProvider.IEX;
+				break;
+			default: source = SubProvider.IEX;
+		}
+
+		ByteBuffer priceBuffer = bytes.slice(6 + symbolLength, 4);
+		priceBuffer.order(ByteOrder.LITTLE_ENDIAN);
+		double price = priceBuffer.getFloat();
+
+		ByteBuffer sizeBuffer = bytes.slice(10 + symbolLength, 4);
+		sizeBuffer.order(ByteOrder.LITTLE_ENDIAN);
+		long size = Integer.toUnsignedLong(sizeBuffer.getInt());
+
+		ByteBuffer timeStampBuffer = bytes.slice(14 + symbolLength, 8);
+		timeStampBuffer.order(ByteOrder.LITTLE_ENDIAN);
+		long nanoSecondsSinceEpoch = timeStampBuffer.getLong();
+
+		ByteBuffer volumeBuffer = bytes.slice(22 + symbolLength, 4);
+		volumeBuffer.order(ByteOrder.LITTLE_ENDIAN);
+		long totalVolume = Integer.toUnsignedLong(volumeBuffer.getInt());
+
+		ByteBuffer marketCenterBuffer = bytes.slice(4 + symbolLength, 2);
+		marketCenterBuffer.order(ByteOrder.LITTLE_ENDIAN);
+		char marketCenter = marketCenterBuffer.getChar();
+
+		String condition = "";
+		if (conditionLength > 0) {
+			condition = StandardCharsets.US_ASCII.decode(bytes.slice(27 + symbolLength, conditionLength)).toString();
+		}
+
+		return new Trade(symbol, source, marketCenter, price, size, nanoSecondsSinceEpoch, totalVolume, condition);
 	}
 	
 }

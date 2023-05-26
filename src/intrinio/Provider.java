@@ -2,7 +2,7 @@ package intrinio;
 
 public enum Provider {
 	NONE,
-	IEX,
+	REALTIME,
 	MANUAL,
 	DELAYED_SIP,
 	NASDAQ_BASIC

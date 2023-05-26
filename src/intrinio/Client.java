@@ -51,6 +51,10 @@ public class Client implements WebSocket.Listener {
 	private OnQuote onQuote = (Quote quote) -> {};
 	private Thread[] processDataThreads;
 	private boolean isCancellationRequested = false;
+	private String HeaderClientInformationKey = "Client-Information";
+	private String HeaderClientInformationValue = "IntrinioRealtimeJavaSDKv6.0";
+	private String HeaderMessageVersionKey = "UseNewEquitiesFormat";
+	private String HeaderMessageVersionValue = "v2";
 	//endregion Data Members
 
 	//region Constructors
@@ -113,7 +117,7 @@ public class Client implements WebSocket.Listener {
 	private String getAuthUrl() throws Exception {
 		String authUrl;
 		switch (config.getProvider()) {
-			case IEX: authUrl = "https://realtime-mx.intrinio.com/auth?api_key=" + config.getApiKey();
+			case REALTIME: authUrl = "https://realtime-mx.intrinio.com/auth?api_key=" + config.getApiKey();
 				break;
 			case DELAYED_SIP: authUrl = "https://realtime-delayed-sip.intrinio.com/auth?api_key=" + config.getApiKey();
 				break;
@@ -129,7 +133,7 @@ public class Client implements WebSocket.Listener {
 	private String getWebSocketUrl (String token) throws Exception {
 		String wsUrl;
 		switch (config.getProvider()) {
-			case IEX: wsUrl = "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
+			case REALTIME: wsUrl = "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
 				break;
 			case DELAYED_SIP: wsUrl = "wss://realtime-delayed-sip.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
 				break;
@@ -354,33 +358,37 @@ public class Client implements WebSocket.Listener {
 	//region Private Methods
 	private void processData(){
 		while (!this.isCancellationRequested) {
-			int count, startIndex, len;
+			int count, offset, messageLength;
 			byte type;
-			//ByteBuffer buffer, offsetBuffer;
+			ByteBuffer buffer, offsetBuffer;
 			try {
 				byte[] datum = data.poll(1, TimeUnit.SECONDS);
 				if (datum != null) {
 					count = datum[0];
-					startIndex = 1;
-					for (int i = 0; i < count; i++) {
-						type = datum[startIndex];
-						len = datum[startIndex+1];
+					offset = 1;
+					buffer = ByteBuffer.wrap(datum);
+					buffer.position(0);
+					buffer.limit(datum.length);
+					for (long i = 0L; i < count; i++) {
+						buffer.position(0);
+						type = datum[offset];
+						messageLength = datum[offset + 1];
+						offsetBuffer = buffer.slice(offset, messageLength);
 						switch (type) {
 							case 0:
-								Trade trade = Trade.parse(datum, startIndex);
+								Trade trade = Trade.parse(offsetBuffer);
 								onTrade.onTrade(trade);
-								startIndex = startIndex + len;
 								break;
 							case 1:
 							case 2:
-								Quote quote = Quote.parse(datum, startIndex);
+								Quote quote = Quote.parse(offsetBuffer);
 								onQuote.onQuote(quote);
-								startIndex = startIndex + len;
 								break;
 							default:
 								Client.Log("Error parsing multi-part message. Type is %d", type);
 								i = count;
 						}
+						offset += messageLength;
 					}
 				}
 			} catch (Exception ex)
@@ -444,6 +452,7 @@ public class Client implements WebSocket.Listener {
 		wsLock.writeLock().lock();
 		try {
 			Client.Log("Websocket - Connecting...");
+			WebSocketState wsState = new WebSocketState();
 			String wsUrl;
 			try {
 				wsUrl = this.getWebSocketUrl(token);
@@ -461,8 +470,8 @@ public class Client implements WebSocket.Listener {
 			HttpClient httpClient = HttpClient.newHttpClient();
 			CompletableFuture<WebSocket> task =
 				httpClient.newWebSocketBuilder()
-				.header("UseNewEquitiesFormat", "v2")
-				.header("Client-Information", "IntrinioRealtimeJavaSDKv6.0")
+				.header(HeaderMessageVersionKey, HeaderMessageVersionValue)
+				.header(HeaderClientInformationKey, HeaderClientInformationValue)
 				.buildAsync(uri, (WebSocket.Listener) this);
 			try {
 				WebSocket ws = task.get();
@@ -541,7 +550,7 @@ public class Client implements WebSocket.Listener {
 		HttpURLConnection con;
 		try {
 			con = (HttpURLConnection) url.openConnection();
-			con.setRequestProperty("Client-Information", "IntrinioRealtimeJavaSDKv6.0");
+			con.setRequestProperty(HeaderClientInformationKey, HeaderClientInformationValue);
 		} catch (IOException e) {
 			Client.Log("Authorization Failure. Please check your network connection. " + e.getMessage());
 			return false;

@@ -17,6 +17,10 @@ public record Trade
 	 long timestamp,
 	 long totalVolume,
 	 String conditions) {
+
+	public boolean isDarkpool(){
+		return marketCenter == 'D' || marketCenter == 'E'  || marketCenter == '\0' || marketCenter == Character.MIN_VALUE;
+	}
 	
 	public String toString() {
 		return

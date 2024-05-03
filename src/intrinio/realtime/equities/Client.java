@@ -1,4 +1,4 @@
-package intrinio;
+package intrinio.realtime.equities;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -61,7 +61,7 @@ public class Client implements WebSocket.Listener {
 	public Client() {
 		try {
 			config = Config.load();
-			processDataThreads = new Thread[config.getNumThreads()];
+			processDataThreads = new Thread[config.getEquitiesNumThreads()];
 		} catch (Exception e) {
 			Client.Log("Initialization Failure. " + e.getMessage());
 		}
@@ -70,7 +70,7 @@ public class Client implements WebSocket.Listener {
 	public Client(Config config) {
 		try {
 			this.config = config;
-			processDataThreads = new Thread[config.getNumThreads()];
+			processDataThreads = new Thread[config.getEquitiesNumThreads()];
 		} catch (Exception e) {
 			Client.Log("Initialization Failure. " + e.getMessage());
 		}
@@ -116,14 +116,14 @@ public class Client implements WebSocket.Listener {
 
 	private String getAuthUrl() throws Exception {
 		String authUrl;
-		switch (config.getProvider()) {
-			case REALTIME: authUrl = "https://realtime-mx.intrinio.com/auth?api_key=" + config.getApiKey();
+		switch (config.getEquitiesProvider()) {
+			case REALTIME: authUrl = "https://realtime-mx.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
 				break;
-			case DELAYED_SIP: authUrl = "https://realtime-delayed-sip.intrinio.com/auth?api_key=" + config.getApiKey();
+			case DELAYED_SIP: authUrl = "https://realtime-delayed-sip.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
 				break;
-			case NASDAQ_BASIC: authUrl = "https://realtime-nasdaq-basic.intrinio.com/auth?api_key=" + config.getApiKey();
+			case NASDAQ_BASIC: authUrl = "https://realtime-nasdaq-basic.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
 				break;
-			case MANUAL: authUrl = "http://" + config.getIpAddress() + "/auth?api_key=" + config.getApiKey();
+			case MANUAL: authUrl = "http://" + config.getEquitiesIpAddress() + "/auth?api_key=" + config.getEquitiesApiKey();
 				break;
 			default: throw new Exception("Provider not specified!");
 		}
@@ -132,14 +132,14 @@ public class Client implements WebSocket.Listener {
 
 	private String getWebSocketUrl (String token) throws Exception {
 		String wsUrl;
-		switch (config.getProvider()) {
+		switch (config.getEquitiesProvider()) {
 			case REALTIME: wsUrl = "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
 				break;
 			case DELAYED_SIP: wsUrl = "wss://realtime-delayed-sip.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
 				break;
 			case NASDAQ_BASIC: wsUrl = "wss://realtime-nasdaq-basic.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
 				break;
-			case MANUAL: wsUrl = "ws://" + config.getIpAddress() + "/socket/websocket?vsn=1.0.0&token=" + token;
+			case MANUAL: wsUrl = "ws://" + config.getEquitiesIpAddress() + "/socket/websocket?vsn=1.0.0&token=" + token;
 				break;
 			default: throw new Exception("Provider not specified!");
 		}
@@ -239,8 +239,8 @@ public class Client implements WebSocket.Listener {
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {}
 		}
-		String[] symbols = config.getSymbols();
-		boolean tradesOnly = config.isTradesOnly();
+		String[] symbols = config.getEquitiesSymbols();
+		boolean tradesOnly = config.isEquitiesTradesOnly();
 		for (String symbol : symbols) {
 			if (!this.channels.contains(new Channel(symbol, tradesOnly))) {
 				this._join(symbol, tradesOnly);
@@ -249,7 +249,7 @@ public class Client implements WebSocket.Listener {
 	}
 
 	public void join(String symbol, boolean tradesOnly) {
-		boolean t = tradesOnly || config.isTradesOnly();
+		boolean t = tradesOnly || config.isEquitiesTradesOnly();
 		while (!this.allReady()) {
 			try {
 				Thread.sleep(1000);
@@ -265,7 +265,7 @@ public class Client implements WebSocket.Listener {
 	}
 
 	public void join(String[] symbols, boolean tradesOnly) {
-		boolean t = tradesOnly || config.isTradesOnly();
+		boolean t = tradesOnly || config.isEquitiesTradesOnly();
 		while (!this.allReady()) {
 			try {
 				Thread.sleep(1000);
@@ -287,7 +287,7 @@ public class Client implements WebSocket.Listener {
 	}
 
 	public void joinLobby(boolean tradesOnly){
-		boolean t = tradesOnly || config.isTradesOnly();
+		boolean t = tradesOnly || config.isEquitiesTradesOnly();
 		while (!this.allReady()) {
 			try {
 				Thread.sleep(1000);

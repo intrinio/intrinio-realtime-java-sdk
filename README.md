@@ -32,15 +32,15 @@ For a sample Java project see: [intrinio-realtime-java-sdk](https://github.com/i
 ```java
 public static void main(String[] args) {
 		Client.Log("Starting sample app");
-		TradeHandler tradeHandler = new TradeHandler();
-		QuoteHandler quoteHandler = new QuoteHandler();
-		Client client = new Client(tradeHandler, quoteHandler);
+		TradeHandler optionsTradeHandler = new TradeHandler();
+		QuoteHandler optionsQuoteHandler = new QuoteHandler();
+		Client client = new Client(optionsTradeHandler, optionsQuoteHandler);
 		Timer timer = new Timer();
 		TimerTask task = new TimerTask() {
 			public void run() {
 				Client.Log(client.getStats());
-				tradeHandler.tryLog();
-				quoteHandler.tryLog();
+				optionsTradeHandler.tryLog();
+				optionsQuoteHandler.tryLog();
 			}
 		};
 		timer.schedule(task, 10000, 10000);
@@ -108,9 +108,9 @@ You will receive your Intrinio API Key after [creating an account](https://intri
 
 ## Methods
 
-`Client client = new Client(tradeHandler, quoteHandler)` - Creates an Intrinio Real-Time client. The provided handlers implement OnTrade and OnQuote, which handle what happens when the associated event happens.
-* **Parameter** `tradeHandler`: The handler for trade events. This function will be invoked when a 'trade' has been received. The trade will be passed as an argument to the callback.
-* **Parameter** `quoteHandler`: Optional. The handler for quote events. This function will be invoked when a 'quote' has been received. The quote will be passed as an argument to the callback. If 'onQuote' is not provided, the client will NOT request to receive quote updates from the server.
+`Client client = new Client(optionsTradeHandler, optionsQuoteHandler)` - Creates an Intrinio Real-Time client. The provided handlers implement OnTrade and OnQuote, which handle what happens when the associated event happens.
+* **Parameter** `optionsTradeHandler`: The handler for trade events. This function will be invoked when a 'trade' has been received. The trade will be passed as an argument to the callback.
+* **Parameter** `optionsQuoteHandler`: Optional. The handler for quote events. This function will be invoked when a 'quote' has been received. The quote will be passed as an argument to the callback. If 'onQuote' is not provided, the client will NOT request to receive quote updates from the server.
 ---------
 `client.join(symbols, tradesOnly);` - Joins the given channels. This can be called at any time. The client will automatically register joined channels and establish the proper subscriptions with the WebSocket connection. If no arguments are provided, this function joins channel(s) configured in config.json.
 * **Parameter** `symbols` - Optional. A string representing a single ticker symbol (e.g. "AAPL") or an array of ticker symbols (e.g. ["AAPL", "MSFT", "GOOG"]) to join. You can also use the special symbol, "lobby" to join the firehose channel and recieved updates for all ticker symbols. You must have a valid "firehose" subscription.

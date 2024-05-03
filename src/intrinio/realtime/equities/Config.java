@@ -8,7 +8,7 @@ import com.google.gson.Gson;
 
 public class Config {
 	
-	private static final String filename = "intrinio/realtime/equities/config.json";
+	private static final String filename = "intrinio/config.json";
 	
 	private String equitiesApiKey;
 	private Provider equitiesProvider = Provider.NONE;

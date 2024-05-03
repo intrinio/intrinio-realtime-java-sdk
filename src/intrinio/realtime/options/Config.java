@@ -8,7 +8,7 @@ import java.io.Reader;
 
 public class Config {
 	
-	private static final String filename = "intrinio/realtime/options/config.json";
+	private static final String filename = "intrinio/config.json";
 	
 	private String optionsApiKey;
 	private Provider optionsProvider = Provider.NONE;

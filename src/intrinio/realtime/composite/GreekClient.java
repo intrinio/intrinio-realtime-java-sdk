@@ -1,8 +1,9 @@
 package intrinio.realtime.composite;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import com.google.gson.Gson;
+import intrinio.realtime.options.Config;
+
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -29,7 +30,7 @@ public class GreekClient
     private Timer apiFetchTimer;
     private TimerTask riskFreeInterestRateTimerTask;
     private volatile boolean isStopped = true;
-    private final String riskFreeInterestRateUrlFormat = "https://api-v2.intrinio.com/indices/economic/$DTB3/historical_data/level?api_key=%s";
+    private final String riskFreeInterestRateUrlFormat = "https://api-v2.intrinio.com/indices/economic/$DTB3/data_point/level/number?api_key=%s";
     private final String dividendYieldUrlFormat = "https://api-v2.intrinio.com/securities/%s/data_point/dividendyield?api_key=%s";
     private final ReentrantLock dividendYieldTimerTasksLock;
     private final HashMap<String, TimerTask> dividendYieldTimerTasks;

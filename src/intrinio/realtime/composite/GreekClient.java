@@ -8,11 +8,13 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 public class GreekClient
 {
@@ -152,6 +154,13 @@ public class GreekClient
         calcData.setRiskFreeInterestRate(riskFreeInterestRate);
         Greek greek = greekCalculator.Calculate(calcData, contract);
         return greek;
+    }
+
+    public List<String> getContracts(String ticker){
+        GreekCalculationData calcData = getGreekCalculationData(ticker);
+        if (calcData == null)
+            return null;
+        return calcData.getOptionsContracts().stream().map(OptionsContractData::getContract).collect(Collectors.toList());
     }
     //endregion Public Methods
 

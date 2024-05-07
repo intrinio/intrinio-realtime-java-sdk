@@ -18,7 +18,7 @@ public class GreekSampleApp {
 
         intrinio.realtime.options.Config optionsConfig = null;
         try{
-            optionsConfig = new intrinio.realtime.options.Config(apiKey, intrinio.realtime.options.Provider.OPRA, null, new String[]{"NVDA"}, 8);
+            optionsConfig = new intrinio.realtime.options.Config(apiKey, intrinio.realtime.options.Provider.OPRA, null, new String[0], 8);
         }catch (Exception e){
             System.out.println("Error parsing options config: " + e.getMessage());
             return;
@@ -26,7 +26,7 @@ public class GreekSampleApp {
 
         intrinio.realtime.equities.Config equitiesConfig = null;
         try{
-            equitiesConfig = new intrinio.realtime.equities.Config(apiKey, intrinio.realtime.equities.Provider.NASDAQ_BASIC, null, new String[]{"NVDA"}, true, 4);
+            equitiesConfig = new intrinio.realtime.equities.Config(apiKey, intrinio.realtime.equities.Provider.NASDAQ_BASIC, null, new String[0], true, 4);
         }catch (Exception e){
             System.out.println("Error parsing equities config: " + e.getMessage());
             return;
@@ -75,11 +75,11 @@ public class GreekSampleApp {
         try{
             greekClient.start();
             equitiesClient.start();
-            //equitiesClient.joinLobby();
-            equitiesClient.join();
+            equitiesClient.joinLobby();
+            //equitiesClient.join();
             optionsClient.start();
-            //optionsClient.joinLobby();
-            optionsClient.join();
+            optionsClient.joinLobby();
+            //optionsClient.join();
         }catch (Exception e) {
             e.printStackTrace();
         }
@@ -93,7 +93,8 @@ public class GreekSampleApp {
                     String date = dtf.format(now);
                     intrinio.realtime.options.Client.Log(date + " " + optionsClient.getStats());
                     intrinio.realtime.equities.Client.Log(date + " " + equitiesClient.getStats());
-                    intrinio.realtime.composite.Greek greek = greekClient.getGreek("NVDA", "NVDA__240517C00900000");
+                    String randomContract = greekClient.getContracts("NVDA").getFirst();
+                    intrinio.realtime.composite.Greek greek = greekClient.getGreek("NVDA", randomContract);
                     intrinio.realtime.equities.Client.Log(greek == null ? "reporting greek not found" : greek.toString());
                 }catch (Exception e){
                     System.out.println("Error in summary timer: " + e.getMessage());

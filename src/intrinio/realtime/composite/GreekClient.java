@@ -6,7 +6,6 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -94,7 +93,7 @@ public class GreekClient
     //endregion Constructors
 
     //region Public Methods
-    public void Start(){
+    public void start(){
         if (isStopped){
             if (apiFetchTimer == null){
                 apiFetchTimer = new Timer();
@@ -110,7 +109,7 @@ public class GreekClient
         startThreads();
     }
 
-    public void Stop(){
+    public void stop(){
         isStopped = true;
         try{
             if (this.apiFetchTimer != null)
@@ -132,19 +131,19 @@ public class GreekClient
         }
     }
 
-    public void OnEquitiesTrade(intrinio.realtime.equities.Trade trade){
+    public void onEquitiesTrade(intrinio.realtime.equities.Trade trade){
         equitiesTradeQueue.offer(trade);
     }
 
-    public void OnOptionsTrade(intrinio.realtime.options.Trade trade){
+    public void onOptionsTrade(intrinio.realtime.options.Trade trade){
         optionsTradeQueue.offer(trade);
     }
 
-    public void OnOptionsQuote(intrinio.realtime.options.Quote quote){
+    public void onOptionsQuote(intrinio.realtime.options.Quote quote){
         optionsQuoteQueue.offer(quote);
     }
 
-    public Greek GetGreek(String ticker, String contract){
+    public Greek getGreek(String ticker, String contract){
         GreekCalculationData calcData = getGreekCalculationData(ticker);
         calcData.setRiskFreeInterestRate(riskFreeInterestRate);
         Greek greek = greekCalculator.Calculate(calcData, contract);

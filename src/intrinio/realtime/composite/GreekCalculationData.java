@@ -47,7 +47,7 @@ public class GreekCalculationData {
 
     public boolean setUnderlyingTrade(intrinio.realtime.equities.Trade trade){
         //dirty set
-        if (trade.timestamp() > underlyingTrade.timestamp()) {
+        if ((underlyingTrade == null) || (trade.timestamp() > underlyingTrade.timestamp())) {
             underlyingTrade = trade;
             return true;
         }

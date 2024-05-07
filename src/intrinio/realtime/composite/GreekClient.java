@@ -29,8 +29,8 @@ public class GreekClient
     private Timer apiFetchTimer;
     private TimerTask riskFreeInterestRateTimerTask;
     private volatile boolean isStopped = true;
-    private final String riskFreeInterestRateUrlFormat = "https://api-v2.intrinio.com/...?api_key=%s";
-    private final String dividendYieldUrlFormat = "https://api-v2.intrinio.com/...?api_key=%s";
+    private final String riskFreeInterestRateUrlFormat = "https://api-v2.intrinio.com/indices/economic/$DTB3/historical_data/level?api_key=%s";
+    private final String dividendYieldUrlFormat = "https://api-v2.intrinio.com/securities/%s/data_point/dividendyield?api_key=%s";
     private final ReentrantLock dividendYieldTimerTasksLock;
     private final HashMap<String, TimerTask> dividendYieldTimerTasks;
     private final ReentrantLock dataLock;
@@ -78,6 +78,7 @@ public class GreekClient
         if (initialRiskFreeInterestRate != null && !Double.isNaN(initialRiskFreeInterestRate) && !Double.isInfinite(initialRiskFreeInterestRate))
             this.riskFreeInterestRate = initialRiskFreeInterestRate;
         this.riskFreeInterestRateRefreshPeriod = riskFreeInterestRateRefreshPeriod;
+        this.dividendYieldRefreshPeriod = dividendYieldRefreshPeriod;
         this.apiFetchTimer = new Timer();
         this.riskFreeInterestRateTimerTask = CreateRiskFreeInterestRateFetcherTimerTask();
         this.numEquityTradeProcessingThreads = numEquityTradeProcessingThreads;
@@ -145,6 +146,8 @@ public class GreekClient
 
     public Greek getGreek(String ticker, String contract){
         GreekCalculationData calcData = getGreekCalculationData(ticker);
+        if (calcData == null)
+            return null;
         calcData.setRiskFreeInterestRate(riskFreeInterestRate);
         Greek greek = greekCalculator.Calculate(calcData, contract);
         return greek;
@@ -233,7 +236,7 @@ public class GreekClient
 
     private double getDividendYield(String ticker) throws IOException {
         Log(String.format("Refreshing dividend yield for %s...", ticker));
-        String apiUrl = String.format(this.dividendYieldUrlFormat, this.apiKey);
+        String apiUrl = String.format(this.dividendYieldUrlFormat, ticker, this.apiKey);
         URL url = new URL(apiUrl);
         HttpURLConnection con = (HttpURLConnection) url.openConnection();
         con.setRequestMethod("GET");
@@ -242,7 +245,7 @@ public class GreekClient
             BufferedReader reader = new BufferedReader(new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8));
             String newRiskFreeInterestRateResult = reader.readLine();
             double rate = Double.parseDouble(newRiskFreeInterestRateResult);
-            Log("Refreshing dividend yield for %s complete.");
+            Log(String.format("Refreshing dividend yield for %s complete.", ticker));
             return rate;
         }
         throw new IOException("Bad status code: " + status);

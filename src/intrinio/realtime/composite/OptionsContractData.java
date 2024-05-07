@@ -30,7 +30,7 @@ public class OptionsContractData {
 
     public boolean setLatestTrade(intrinio.realtime.options.Trade trade){
         //dirty set
-        if (trade.timestamp() > latestTrade.timestamp()) {
+        if ((latestTrade == null) || (trade.timestamp() > latestTrade.timestamp())) {
             latestTrade = trade;
             return true;
         }
@@ -39,7 +39,7 @@ public class OptionsContractData {
 
     public boolean setLatestQuote(intrinio.realtime.options.Quote quote){
         //dirty set
-        if (quote.timestamp() > latestQuote.timestamp()) {
+        if ((latestQuote == null) || (quote.timestamp() > latestQuote.timestamp())) {
             latestQuote = quote;
             return true;
         }

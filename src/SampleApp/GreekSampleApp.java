@@ -18,7 +18,7 @@ public class GreekSampleApp {
 
         intrinio.realtime.options.Config optionsConfig = null;
         try{
-            optionsConfig = new intrinio.realtime.options.Config(apiKey, intrinio.realtime.options.Provider.OPRA, null, new String[]{"NVDA__240517C00900000"}, 8);
+            optionsConfig = new intrinio.realtime.options.Config(apiKey, intrinio.realtime.options.Provider.OPRA, null, new String[]{"NVDA"}, 8);
         }catch (Exception e){
             System.out.println("Error parsing options config: " + e.getMessage());
             return;

@@ -7,5 +7,6 @@ public enum RefreshPeriod
     FIVE_MINUTES,
     FIFTEEN_MINUTES,
     THIRTY_MINUTES,
-    SIXTY_MINUTES
+    SIXTY_MINUTES,
+    ONE_DAY
 }

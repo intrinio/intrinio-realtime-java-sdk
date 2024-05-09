@@ -218,6 +218,7 @@ public class GreekClient
             case FIFTEEN_MINUTES -> 900_000L;
             case THIRTY_MINUTES -> 1_800_000L;
             case SIXTY_MINUTES -> 3_600_000L;
+            case ONE_DAY -> 86_400_000L;
         };
     }
 

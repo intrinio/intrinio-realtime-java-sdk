@@ -21,12 +21,14 @@ public class BlackScholesGreekCalculator implements GreekCalculator
         intrinio.realtime.options.Quote latestOptionQuote = contractData.getLatestQuote();
         if (latestOptionTrade == null || latestOptionQuote == null)
             return null;
+        if (latestOptionQuote.askPrice() <= 0.0 || latestOptionQuote.bidPrice() <= 0.0)
+            return null;
 
         double underlyingPrice = underlyingTrade.price();
         double strike = latestOptionTrade.getStrikePrice();
         double daysToExpiration = getDaysToExpiration(latestOptionTrade, latestOptionQuote);
         double riskFreeInterestRate = calcData.getRiskFreeInterestRate();
-        double marketPrice = latestOptionQuote.askPrice() + latestOptionQuote.bidPrice() / 2.0;
+        double marketPrice = (latestOptionQuote.askPrice() + latestOptionQuote.bidPrice()) / 2.0;
         double impliedVolatility = 0.0;
         double delta = 0.0;
         double gamma = 0.0;

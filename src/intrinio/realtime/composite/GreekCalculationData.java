@@ -2,6 +2,7 @@ package intrinio.realtime.composite;
 
 import java.util.Collection;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class GreekCalculationData {
@@ -33,8 +34,8 @@ public class GreekCalculationData {
         return contracts.getOrDefault(contract, null);
     }
 
-    public Collection<OptionsContractData> getOptionsContracts(){
-        return contracts.values();
+    public ConcurrentHashMap<String, OptionsContractData> getOptionsContracts(){
+        return contracts;
     }
 
     public void setDividendYield(double dividendYield){

@@ -53,7 +53,8 @@ public record Trade(String contract, Exchange exchange, double price, long size,
 		int month = (this.contract.charAt(8) - '0') * 10 + (this.contract.charAt(9) - '0');
 		int day = (this.contract.charAt(10) - '0') * 10 + (this.contract.charAt(11) - '0');
 		ZoneId tz = ZoneId.of("America/New_York");
-		return ZonedDateTime.of(year, month, day, 12, 0, 0, 0, tz);
+		return this.getUnderlyingSymbol() != "SPX" ? ZonedDateTime.of(year, month, day, 16, 0, 0, 0, tz)
+				: ZonedDateTime.of(year, month, day, 9, 30, 0, 0, tz);
 	}
 
 	public String getUnderlyingSymbol() {

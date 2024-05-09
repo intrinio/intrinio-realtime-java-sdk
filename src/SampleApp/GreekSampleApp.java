@@ -43,7 +43,7 @@ public class GreekSampleApp {
                 RefreshPeriod.SIXTY_MINUTES,
                 true,
                 true,
-                true,
+                false,
                 3,
                 4,
                 4);

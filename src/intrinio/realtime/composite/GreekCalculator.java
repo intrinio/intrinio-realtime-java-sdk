@@ -1,5 +1,5 @@
 package intrinio.realtime.composite;
 
 public interface GreekCalculator {
-    Greek Calculate(GreekCalculationData calcData, String contract);
+    Greek calculate(GreekCalculationData calcData, String contract);
 }

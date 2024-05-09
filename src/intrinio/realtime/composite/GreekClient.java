@@ -1,8 +1,5 @@
 package intrinio.realtime.composite;
 
-import com.google.gson.Gson;
-import intrinio.realtime.options.Config;
-
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -149,7 +146,7 @@ public class GreekClient
         if (calcData == null)
             return null;
         calcData.setRiskFreeInterestRate(riskFreeInterestRate);
-        Greek greek = greekCalculator.Calculate(calcData, contract);
+        Greek greek = greekCalculator.calculate(calcData, contract);
         return greek;
     }
 
@@ -310,7 +307,7 @@ public class GreekClient
     }
 
     private void FireGreek(GreekCalculationData calcData, String contract){
-        Greek greek = greekCalculator.Calculate(calcData, contract);
+        Greek greek = greekCalculator.calculate(calcData, contract);
         try{
             if (greek != null){
                 onGreek.onGreek(greek);

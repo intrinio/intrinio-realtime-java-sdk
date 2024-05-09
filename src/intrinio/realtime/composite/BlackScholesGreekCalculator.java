@@ -10,7 +10,7 @@ import java.time.format.DateTimeFormatter;
 public class BlackScholesGreekCalculator implements GreekCalculator
 {
     @Override
-    public Greek Calculate(GreekCalculationData calcData, String contract) {
+    public Greek calculate(GreekCalculationData calcData, String contract) {
         intrinio.realtime.equities.Trade underlyingTrade = calcData.getUnderlyingTrade();
         if (underlyingTrade == null)
             return null;

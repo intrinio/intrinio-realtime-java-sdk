@@ -1,5 +1,5 @@
 package intrinio.realtime.composite;
 
 public interface OnDividendYieldUpdated {
-    void onDividendYieldUpdated(CurrentSecurityData currentSecurityData, CurrentDataCache currentDataCache);
+    void onDividendYieldUpdated(double dividendYield, CurrentSecurityData currentSecurityData, CurrentDataCache currentDataCache);
 }

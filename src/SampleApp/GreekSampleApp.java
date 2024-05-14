@@ -16,7 +16,7 @@ import java.util.TimerTask;
 
 public class GreekSampleApp {
     public static void run(String[] args){
-        String apiKey = "OjZjN2RjMjA5NTU0OTMwYWIzMjU1Njk1ZjlkMDJhNWI0";
+        String apiKey = "API_KEY_HERE";
 
         intrinio.realtime.options.Config optionsConfig = null;
         try{

@@ -135,7 +135,7 @@ public class CurrentDataCache
         }
         if (this.onDividendYieldUpdated != null){
             try{
-                this.onDividendYieldUpdated.onDividendYieldUpdated(currentSecurityData, this);
+                this.onDividendYieldUpdated.onDividendYieldUpdated(dividendYield, currentSecurityData, this);
             }catch (Exception e){
                 System.out.println("Error in onRiskFreeInterestRateUpdated Callback: " + e.getMessage());
             }
@@ -152,7 +152,7 @@ public class CurrentDataCache
             this.riskFreeInterestRate = riskFreeInterestRate;
             if (this.onRiskFreeInterestRateUpdated != null){
                 try{
-                    this.onRiskFreeInterestRateUpdated.onRiskFreeInterestRateUpdated(this);
+                    this.onRiskFreeInterestRateUpdated.onRiskFreeInterestRateUpdated(riskFreeInterestRate, this);
                 }catch (Exception e){
                     System.out.println("Error in onRiskFreeInterestRateUpdated Callback: " + e.getMessage());
                 }

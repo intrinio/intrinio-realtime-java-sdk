@@ -1,5 +1,6 @@
 package SampleApp;
 
+import intrinio.realtime.composite.CurrentDataCache;
 import intrinio.realtime.composite.GreekCalculationMethod;
 import intrinio.realtime.composite.GreekClient;
 import intrinio.realtime.composite.RefreshPeriod;
@@ -15,7 +16,7 @@ import java.util.TimerTask;
 
 public class GreekSampleApp {
     public static void run(String[] args){
-        String apiKey = "API_KEY_HERE";
+        String apiKey = "OjZjN2RjMjA5NTU0OTMwYWIzMjU1Njk1ZjlkMDJhNWI0";
 
         intrinio.realtime.options.Config optionsConfig = null;
         try{
@@ -33,12 +34,14 @@ public class GreekSampleApp {
             return;
         }
 
+        CurrentDataCache currentDataCache = new CurrentDataCache();
+
         //Greek Client
-        intrinio.realtime.composite.OnGreek greekEventHandler = (intrinio.realtime.composite.Greek greek) -> {System.out.println(greek);};
-        GreekClient greekClient = new GreekClient(greekEventHandler,
+        GreekClient greekClient = new GreekClient(currentDataCache,
+                (intrinio.realtime.composite.Greek greek) -> {System.out.println(greek);},
                 GreekCalculationMethod.BLACK_SCHOLES,
                 apiKey,
-                0.0,
+                null,
                 RefreshPeriod.ONE_DAY,
                 RefreshPeriod.ONE_DAY,
                 true,
@@ -94,12 +97,6 @@ public class GreekSampleApp {
                     String date = dtf.format(now);
                     intrinio.realtime.options.Client.Log(date + " " + optionsClient.getStats());
                     intrinio.realtime.equities.Client.Log(date + " " + equitiesClient.getStats());
-//                    List<String> allContracts = greekClient.getContracts("NVDA");
-//                    String randomContract = allContracts != null && allContracts.size() > 0 ? allContracts.get(0) : null;
-//                    if (randomContract == null)
-//                        return;
-//                    intrinio.realtime.composite.Greek greek = greekClient.getGreek("NVDA", randomContract);
-//                    intrinio.realtime.equities.Client.Log(greek == null ? "reporting greek not found" : greek.toString());
                 }catch (Exception e){
                     System.out.println("Error in summary timer: " + e.getMessage());
                 }

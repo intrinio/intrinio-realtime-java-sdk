@@ -1,16 +1,11 @@
 package intrinio.realtime.composite;
 
 public class OptionsContractData {
-    private String contract;
-    private intrinio.realtime.options.Trade latestTrade;
-    private intrinio.realtime.options.Quote latestQuote;
-
-    private OptionsContractData(){
-
-    }
+    private final String contract;
+    private volatile intrinio.realtime.options.Trade latestTrade;
+    private volatile intrinio.realtime.options.Quote latestQuote;
 
     public OptionsContractData(String contract, intrinio.realtime.options.Trade latestTrade, intrinio.realtime.options.Quote latestQuote){
-        this();
         this.contract = contract;
         this.latestTrade = latestTrade;
         this.latestQuote = latestQuote;

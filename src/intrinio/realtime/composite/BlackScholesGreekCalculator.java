@@ -1,12 +1,5 @@
 package intrinio.realtime.composite;
 
-import jdk.jfr.Timespan;
-
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-
 public class BlackScholesGreekCalculator implements GreekCalculator
 {
     private final double LOW_VOL = 0.0;
@@ -16,20 +9,15 @@ public class BlackScholesGreekCalculator implements GreekCalculator
     private final double MAX_Z_SCORE = 8.0;
 
     @Override
-    public Greek calculate(GreekCalculationData calcData, String contract) {
-        intrinio.realtime.equities.Trade underlyingTrade = calcData.getUnderlyingTrade();
-        if (underlyingTrade == null)
-            return null;
-        OptionsContractData contractData = calcData.getOptionsContractData(contract);
-        if (contractData == null)
-            return null;
-        intrinio.realtime.options.Trade latestOptionTrade = contractData.getLatestTrade();
-        intrinio.realtime.options.Quote latestOptionQuote = contractData.getLatestQuote();
-        if (latestOptionTrade == null || latestOptionQuote == null)
+    public Greek calculate(String contract, CurrentSecurityData calcData, Double riskFreeInterestRate) {
+        intrinio.realtime.equities.Trade underlyingTrade = calcData.getEquitiesTrade();
+        intrinio.realtime.options.Trade latestOptionTrade = calcData.getOptionsTrade(contract);
+        intrinio.realtime.options.Quote latestOptionQuote = calcData.getOptionsQuote(contract);
+        if (underlyingTrade == null || latestOptionTrade == null || latestOptionQuote == null)
             return null;
         if (latestOptionQuote.askPrice() <= 0.0 || latestOptionQuote.bidPrice() <= 0.0)
             return null;
-        if (calcData.getRiskFreeInterestRate() <= 0.0)
+        if (riskFreeInterestRate == null || riskFreeInterestRate <= 0.0)
             return null;
 
         boolean isPut = latestOptionTrade.isPut();
@@ -37,7 +25,6 @@ public class BlackScholesGreekCalculator implements GreekCalculator
         double strike = latestOptionTrade.getStrikePrice();
         double daysToExpiration = getDaysToExpiration(latestOptionTrade, latestOptionQuote);
         double dividendYield = calcData.getDividendYield();
-        double riskFreeInterestRate = calcData.getRiskFreeInterestRate();
         double marketPrice = (latestOptionQuote.askPrice() + latestOptionQuote.bidPrice()) / 2.0;
         double impliedVolatility = calcImpliedVolatility(isPut, underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice);
         double sigma = impliedVolatility;
@@ -46,7 +33,7 @@ public class BlackScholesGreekCalculator implements GreekCalculator
         double theta = calcTheta(isPut, underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
         double vega = calcVega(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
 
-        return getGreek(calcData, contract, daysToExpiration, marketPrice, impliedVolatility, delta, gamma, theta, vega);
+        return getGreek(calcData, riskFreeInterestRate, contract, daysToExpiration, marketPrice, impliedVolatility, delta, gamma, theta, vega);
     }
 
     private double calcImpliedVolatilityCall(double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice) {
@@ -181,13 +168,13 @@ public class BlackScholesGreekCalculator implements GreekCalculator
         return (expiration - latestActivity) / 86400.0; //86400 is seconds in a day
     }
 
-    private Greek getGreek(GreekCalculationData calcData, String contract, double daysToExpiration, double marketPrice, double impliedVolatility, double delta, double gamma, double theta, double vega){
-        return new Greek(calcData.getUnderlyingTrade().symbol(),
+    private Greek getGreek(CurrentSecurityData calcData, Double riskFreeInterestRate, String contract, double daysToExpiration, double marketPrice, double impliedVolatility, double delta, double gamma, double theta, double vega){
+        return new Greek(calcData.getTickerSymbol(),
                 contract,
-                calcData.getUnderlyingTrade(),
-                calcData.getOptionsContracts().get(contract).getLatestTrade(),//latestOptionTrade,
-                calcData.getOptionsContracts().get(contract).getLatestQuote(),//latestOptionQuote,
-                calcData.getRiskFreeInterestRate(),
+                calcData.getEquitiesTrade(),
+                calcData.getAllOptionsContractData().get(contract).getLatestTrade(),//latestOptionTrade,
+                calcData.getAllOptionsContractData().get(contract).getLatestQuote(),//latestOptionQuote,
+                riskFreeInterestRate,
                 calcData.getDividendYield(),
                 daysToExpiration,
                 marketPrice,

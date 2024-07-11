@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.intrinio</groupId>
   <artifactId>IntrinioRealtimeJavaSDK</artifactId>
-  <version>6.1.0</version>
+  <version>7.0.0</version>
   <packaging>jar</packaging>
   <name>IntrinioRealtimeJavaSDK</name>
   <build>
@@ -43,6 +43,20 @@
             </manifest>
           </archive>
         </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>install</phase>
+            <goals>
+              <goal>copy-dependencies</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/lib</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

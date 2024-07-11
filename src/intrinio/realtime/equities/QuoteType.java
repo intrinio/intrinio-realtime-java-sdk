@@ -1,4 +1,4 @@
-package intrinio;
+package intrinio.realtime.equities;
 
 public enum QuoteType {
 	INVALID,

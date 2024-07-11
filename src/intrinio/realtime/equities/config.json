@@ -1,0 +1,7 @@
+{
+	"equitiesApiKey": "",
+	"equitiesProvider": "REALTIME",
+	"equitiesSymbols": [ "GOOG", "MSFT", "AAPL" ],
+	"equitiesTradesOnly": false,
+	"equitiesNumThreads": 2
+}

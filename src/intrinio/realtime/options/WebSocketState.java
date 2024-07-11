@@ -1,4 +1,4 @@
-package intrinio;
+package intrinio.realtime.options;
 
 import java.net.http.WebSocket;
 import java.time.LocalDateTime;

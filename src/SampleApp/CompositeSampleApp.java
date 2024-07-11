@@ -11,11 +11,10 @@ import java.util.TimerTask;
 public class CompositeSampleApp {
     public static void run(String[] args){
         String apiKey = "API_KEY_HERE";
-        String tickerSymbol = "NVDA";
 
         intrinio.realtime.options.Config optionsConfig = null;
         try{
-            optionsConfig = new intrinio.realtime.options.Config(apiKey, intrinio.realtime.options.Provider.OPRA, null, new String[]{tickerSymbol}, 8);
+            optionsConfig = new intrinio.realtime.options.Config(apiKey, intrinio.realtime.options.Provider.OPRA, null, new String[0], 8);
         }catch (Exception e){
             System.out.println("Error parsing options config: " + e.getMessage());
             return;
@@ -23,7 +22,7 @@ public class CompositeSampleApp {
 
         intrinio.realtime.equities.Config equitiesConfig = null;
         try{
-            equitiesConfig = new intrinio.realtime.equities.Config(apiKey, intrinio.realtime.equities.Provider.NASDAQ_BASIC, null, new String[]{tickerSymbol}, true, 4);
+            equitiesConfig = new intrinio.realtime.equities.Config(apiKey, intrinio.realtime.equities.Provider.NASDAQ_BASIC, null, new String[0], true, 4);
         }catch (Exception e){
             System.out.println("Error parsing equities config: " + e.getMessage());
             return;
@@ -59,11 +58,11 @@ public class CompositeSampleApp {
 
         try{
             equitiesClient.start();
-            //equitiesClient.joinLobby();
-            equitiesClient.join();
+            equitiesClient.joinLobby();
+            //equitiesClient.join();
             optionsClient.start();
-            //optionsClient.joinLobby();
-            optionsClient.join();
+            optionsClient.joinLobby();
+            //optionsClient.join();
         }catch (Exception e) {
             e.printStackTrace();
         }
@@ -77,15 +76,19 @@ public class CompositeSampleApp {
                     String date = dtf.format(now);
                     intrinio.realtime.options.Client.Log(date + " " + optionsClient.getStats());
                     intrinio.realtime.equities.Client.Log(date + " " + equitiesClient.getStats());
-                    SecurityData securityData = currentDataCache.getSecurityData(tickerSymbol);
-                    intrinio.realtime.options.Client.Log(date + " " + tickerSymbol + " latest trade:\r\n\t" + securityData.getEquitiesTrade());
-                    intrinio.realtime.options.Client.Log(date + " " + tickerSymbol + " latest quote:\r\n\t" + securityData.getEquitiesQuote());
-                    Map<String, OptionsContractData> contracts = securityData.getAllOptionsContractData();
-                    intrinio.realtime.options.Client.Log(date + " " + tickerSymbol + " number of contracts: " + contracts.size());
-                    OptionsContractData firstContract = contracts.entrySet().stream().findFirst().map(Map.Entry::getValue).orElse(null);
-                    intrinio.realtime.options.Client.Log(date + " " + tickerSymbol + " first contract trade:\r\n\t" + firstContract.getTrade());
-                    intrinio.realtime.options.Client.Log(date + " " + tickerSymbol + " first contract quote:\r\n\t" + firstContract.getQuote());
-                    intrinio.realtime.options.Client.Log(date + " " + tickerSymbol + " first contract refresh:\r\n\t" + firstContract.getRefresh());
+                    SecurityData securityData = currentDataCache.getAllSecurityData().entrySet().stream().findFirst().map(Map.Entry::getValue).orElse(null);
+                    if (securityData != null){
+                        intrinio.realtime.options.Client.Log(date + " " + " latest trade:\r\n\t" + securityData.getEquitiesTrade());
+                        intrinio.realtime.options.Client.Log(date + " " + " latest quote:\r\n\t" + securityData.getEquitiesQuote());
+                        Map<String, OptionsContractData> contracts = securityData.getAllOptionsContractData();
+                        intrinio.realtime.options.Client.Log(date + " " + " number of contracts: " + contracts.size());
+                        OptionsContractData firstContract = contracts.entrySet().stream().findFirst().map(Map.Entry::getValue).orElse(null);
+                        if (firstContract != null){
+                            intrinio.realtime.options.Client.Log(date + " " + " first contract trade:\r\n\t" + firstContract.getTrade());
+                            intrinio.realtime.options.Client.Log(date + " " + " first contract quote:\r\n\t" + firstContract.getQuote());
+                            intrinio.realtime.options.Client.Log(date + " " + " first contract refresh:\r\n\t" + firstContract.getRefresh());
+                        }
+                    }
                 }catch (Exception e){
                     System.out.println("Error in summary timer: " + e.getMessage());
                 }

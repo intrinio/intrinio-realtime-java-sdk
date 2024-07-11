@@ -48,7 +48,7 @@ public class CurrentDataCache implements DataCache
             try{
                 this.onSupplementalDatumUpdated.onSupplementalDatumUpdated(key, datum, this);
             }catch (Exception e){
-                System.out.println("Error in setsupplementaryDatum Callback: " + e.getMessage());
+                Log("Error in setsupplementaryDatum Callback: " + e.getMessage());
             }
         }
         return isSet;
@@ -243,7 +243,9 @@ public class CurrentDataCache implements DataCache
     //endregion Public Methods
 
     //region Private Methods
-
+    private void Log(String message){
+        System.out.println(message);
+    }
 
     //endregion Private Methods
 }

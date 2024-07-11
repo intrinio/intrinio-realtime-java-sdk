@@ -51,7 +51,7 @@ public class CurrentOptionsContractData implements OptionsContractData {
             try{
                 onOptionsTradeUpdated.onOptionsTradeUpdated(this, dataCache, securityData);
             }catch (Exception e){
-                System.out.println("Error in onOptionsTradeUpdated Callback: " + e.getMessage());
+                Log("Error in onOptionsTradeUpdated Callback: " + e.getMessage());
             }
         }
         return isSet;
@@ -72,7 +72,7 @@ public class CurrentOptionsContractData implements OptionsContractData {
             try{
                 onOptionsQuoteUpdated.onOptionsQuoteUpdated(this, dataCache, securityData);
             }catch (Exception e){
-                System.out.println("Error in onOptionsQuoteUpdated Callback: " + e.getMessage());
+                Log("Error in onOptionsQuoteUpdated Callback: " + e.getMessage());
             }
         }
         return isSet;
@@ -89,7 +89,7 @@ public class CurrentOptionsContractData implements OptionsContractData {
             try{
                 onOptionsRefreshUpdated.onOptionsRefreshUpdated(this, dataCache, securityData);
             }catch (Exception e){
-                System.out.println("Error in onOptionsRefreshUpdated Callback: " + e.getMessage());
+                Log("Error in onOptionsRefreshUpdated Callback: " + e.getMessage());
             }
         }
         return isSet;
@@ -109,11 +109,18 @@ public class CurrentOptionsContractData implements OptionsContractData {
             try{
                 onOptionsContractSupplementalDatumUpdated.onOptionsContractSupplementalDatumUpdated(key, datum, this, securityData, dataCache);
             }catch (Exception e){
-                System.out.println("Error in onOptionsContractSupplementalDatumUpdated Callback: " + e.getMessage());
+                Log("Error in onOptionsContractSupplementalDatumUpdated Callback: " + e.getMessage());
             }
         }
         return result;
     }
 
     public Map<String, Double> getAllSupplementaryData(){return readonlySupplementaryData;}
+
+    //region Private Methods
+    private void Log(String message){
+        System.out.println(message);
+    }
+
+    //endregion Private Methods
 }

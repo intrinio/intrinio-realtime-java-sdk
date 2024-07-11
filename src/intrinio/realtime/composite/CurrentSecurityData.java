@@ -40,7 +40,7 @@ public class CurrentSecurityData implements SecurityData{
             try{
                 onSecuritySupplementalDatumUpdated.onSecuritySupplementalDatumUpdated(key, datum, this, currentDataCache);
             }catch (Exception e){
-                System.out.println("Error in onSecuritySupplementalDatumUpdated Callback: " + e.getMessage());
+                Log("Error in onSecuritySupplementalDatumUpdated Callback: " + e.getMessage());
             }
         }
         return result;
@@ -83,7 +83,7 @@ public class CurrentSecurityData implements SecurityData{
             try{
                 onEquitiesTradeUpdated.onEquitiesTradeUpdated(this, dataCache);
             }catch (Exception e){
-                System.out.println("Error in onEquitiesTradeUpdated Callback: " + e.getMessage());
+                Log("Error in onEquitiesTradeUpdated Callback: " + e.getMessage());
             }
         }
         return isSet;
@@ -104,7 +104,7 @@ public class CurrentSecurityData implements SecurityData{
             try{
                 onEquitiesQuoteUpdated.onEquitiesQuoteUpdated(this, dataCache);
             }catch (Exception e){
-                System.out.println("Error in onEquitiesQuoteUpdated Callback: " + e.getMessage());
+                Log("Error in onEquitiesQuoteUpdated Callback: " + e.getMessage());
             }
         }
         return isSet;
@@ -244,4 +244,11 @@ public class CurrentSecurityData implements SecurityData{
         }
         return currentOptionsContractData.setSupplementaryDatum(key, datum, onOptionsContractSupplementalDatumUpdated, this, dataCache);
     }
+
+    //region Private Methods
+    private void Log(String message){
+        System.out.println(message);
+    }
+
+    //endregion Private Methods
 }

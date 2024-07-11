@@ -34,7 +34,7 @@ public class GreekSampleApp {
             return;
         }
 
-        CurrentDataCache currentDataCache = new CurrentDataCache();
+        intrinio.realtime.composite.DataCache currentDataCache = new CurrentDataCache();
 
         //Greek Client
         GreekClient greekClient = new GreekClient(currentDataCache,

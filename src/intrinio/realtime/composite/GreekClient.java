@@ -28,7 +28,7 @@ public class GreekClient
     private final String dividendYieldUrlFormat = "https://api-v2.intrinio.com/securities/%s/data_point/dividendyield?api_key=%s";
     private final ReentrantLock dividendYieldTimerTasksLock;
     private final HashMap<String, TimerTask> dividendYieldTimerTasks;
-    private final CurrentDataCache data;
+    private final DataCache data;
     private final int numEquityTradeProcessingThreads;
     private final int numOptionTradeProcessingThreads;
     private final int numOptionQuoteProcessingThreads;
@@ -38,10 +38,12 @@ public class GreekClient
     private final ConcurrentLinkedQueue<intrinio.realtime.equities.Trade> equitiesTradeQueue;
     private final ConcurrentLinkedQueue<intrinio.realtime.options.Trade> optionsTradeQueue;
     private final ConcurrentLinkedQueue<intrinio.realtime.options.Quote> optionsQuoteQueue;
+    private final String RiskFreeInterestRateKey = "RiskFreeInterestRate";
+    private final String DividendYieldKey = "DividendYield";
     //endregion Data Members
 
     //region Constructors
-    public GreekClient(CurrentDataCache dataCache,
+    public GreekClient(DataCache dataCache,
                        OnGreek onGreek,
                        GreekCalculationMethod greekCalculationMethod,
                        String apiKey,
@@ -66,9 +68,9 @@ public class GreekClient
         this.notifyOnOptionQuote = notifyOnOptionQuote;
         GreekCalculatorFactory calculatorFactory = new GreekCalculatorFactory();
         greekCalculator = calculatorFactory.GetGreekCalculator(this.greekCalculationMethod);
-        data.setRiskFreeInterestRate(initialRiskFreeInterestRate);
-        this.riskFreeInterestRateRefreshPeriod = riskFreeInterestRateRefreshPeriod == null ? RefreshPeriod.NEVER : riskFreeInterestRateRefreshPeriod;
-        this.dividendYieldRefreshPeriod = dividendYieldRefreshPeriod == null ? RefreshPeriod.NEVER : dividendYieldRefreshPeriod;
+        data.setsupplementaryDatum(RiskFreeInterestRateKey, initialRiskFreeInterestRate);
+        this.riskFreeInterestRateRefreshPeriod = riskFreeInterestRateRefreshPeriod == null ? RefreshPeriod.ONE_DAY : riskFreeInterestRateRefreshPeriod;
+        this.dividendYieldRefreshPeriod = dividendYieldRefreshPeriod == null ? RefreshPeriod.ONE_DAY : dividendYieldRefreshPeriod;
         this.apiFetchTimer = new Timer();
         this.riskFreeInterestRateTimerTask = CreateRiskFreeInterestRateFetcherTimerTask();
         this.numEquityTradeProcessingThreads = numEquityTradeProcessingThreads;
@@ -134,10 +136,10 @@ public class GreekClient
     }
 
     public Greek getGreek(String ticker, String contract){
-        CurrentSecurityData calcData = data.getSecurityData(ticker);
+        SecurityData calcData = data.getSecurityData(ticker);
         if (calcData == null)
             return null;
-        Greek greek = greekCalculator.calculate(contract, calcData, data.getRiskFreeInterestRate());
+        Greek greek = greekCalculator.calculate(contract, calcData, data.getsupplementaryDatum(RiskFreeInterestRateKey));
         return greek;
     }
     //endregion Public Methods
@@ -247,7 +249,7 @@ public class GreekClient
             public void run() {
                 try
                 {
-                    data.setRiskFreeInterestRate(fetchRiskFreeInterestRate());
+                    data.setsupplementaryDatum(RiskFreeInterestRateKey, fetchRiskFreeInterestRate());
                 }
                 catch (Exception ex){
                     Log("Error fetching risk free interest rate: " + ex.getMessage());
@@ -264,7 +266,7 @@ public class GreekClient
                 try
                 {
                     double dividendYield = fetchDividendYield(ticker);
-                    data.setSecuritySupplementalDatum(ticker, dividendYield);
+                    data.setSecuritySupplementalDatum(ticker, DividendYieldKey, dividendYield);
                 }
                 catch (Exception ex){
                     Log(String.format("Error fetching dividend yield rate for ticker %s: %s", ticker, ex.getMessage()));
@@ -273,9 +275,9 @@ public class GreekClient
         };
     }
 
-    private void FireGreek(CurrentSecurityData calcData, String contract){
+    private void FireGreek(SecurityData calcData, String contract){
         if (useOnGreek){
-            Greek greek = greekCalculator.calculate(contract, calcData, data.getRiskFreeInterestRate());
+            Greek greek = greekCalculator.calculate(contract, calcData, data.getsupplementaryDatum(RiskFreeInterestRateKey));
             try{
                 if (greek != null){
                     onGreek.onGreek(greek);
@@ -293,7 +295,7 @@ public class GreekClient
                 if (trade != null){
                     String symbol = trade.symbol();
                     addDividendYieldTimerTask(symbol);
-                    CurrentSecurityData calcData = data.getSecurityData(symbol);
+                    SecurityData calcData = data.getSecurityData(symbol);
                     calcData.setEquitiesTrade(trade);
                     if (notifyOnEquityTrade){
                         for (String contract : calcData.getAllOptionsContractData().keySet()){
@@ -316,7 +318,7 @@ public class GreekClient
                 if (trade != null){
                     String symbol = trade.getUnderlyingSymbol();
                     addDividendYieldTimerTask(symbol);
-                    CurrentSecurityData calcData = data.getSecurityData(symbol);
+                    SecurityData calcData = data.getSecurityData(symbol);
                     calcData.setOptionsContractTrade(trade);
                     if (notifyOnOptionTrade){
                         FireGreek(calcData, trade.contract());
@@ -337,7 +339,7 @@ public class GreekClient
                 if (quote != null){
                     String symbol = quote.getUnderlyingSymbol();
                     addDividendYieldTimerTask(symbol);
-                    CurrentSecurityData calcData = data.getSecurityData(symbol);
+                    SecurityData calcData = data.getSecurityData(symbol);
                     calcData.setOptionsContractQuote(quote);
                     if (notifyOnOptionQuote){
                         FireGreek(calcData, quote.contract());

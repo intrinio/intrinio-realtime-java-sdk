@@ -526,7 +526,7 @@ public class Client implements WebSocket.Listener {
 		HttpURLConnection con;
 		try {
 			con = (HttpURLConnection) url.openConnection();
-			con.setRequestProperty("Client-Information", "IntrinioRealtimeOptionsJavaSDKv3.3");
+			con.setRequestProperty("Client-Information", "IntrinioRealtimeOptionsJavaSDKv4.0");
 		} catch (IOException e) {
 			Client.Log("Authorization Failure. Please check your network connection. " + e.getMessage());
 			return false;

@@ -462,12 +462,8 @@ public class Client implements WebSocket.Listener {
 			} finally {
 				this.wsLock.writeLock().unlock();
 			}
-			if (this.wsState.getLastReset().plusDays(5).compareTo(LocalDateTime.now()) >= 0) {
-				String token = this.fetchToken();
-				initializeWebSocket(token);
-			} else {
-				initializeWebSocket(this.token.get().token());
-			}
+			String token = this.fetchToken();
+			initializeWebSocket(token);
 			return false;
 		}
 	}
@@ -493,18 +489,14 @@ public class Client implements WebSocket.Listener {
 		tLock.readLock().lock();
 		try {
 			Token token = this.token.get();
-			if (LocalDateTime.now().minusDays(1).compareTo(token.date()) > 0) {
-				return token.token();
-			} else {
-				tLock.readLock().unlock();
-				tLock.writeLock().lock();
-				try {
-					doWithRetryBackoff(() -> tryGetNewToken());
-					tLock.readLock().lock();
-					return this.token.get().token();
-				} finally {
-					tLock.writeLock().unlock();
-				}
+			tLock.readLock().unlock();
+			tLock.writeLock().lock();
+			try {
+				doWithRetryBackoff(() -> tryGetNewToken());
+				tLock.readLock().lock();
+				return this.token.get().token();
+			} finally {
+				tLock.writeLock().unlock();
 			}
 		} finally {
 			tLock.readLock().unlock();

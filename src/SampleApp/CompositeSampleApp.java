@@ -83,18 +83,18 @@ public class CompositeSampleApp {
                     intrinio.realtime.options.Client.Log(date + " " + optionsClient.getStats());
                     intrinio.realtime.equities.Client.Log(date + " " + equitiesClient.getStats());
                     SecurityData securityData = currentDataCache.getAllSecurityData().entrySet().stream().findFirst().map(Map.Entry::getValue).orElse(null);
-                    if (securityData != null){
-                        intrinio.realtime.options.Client.Log(date + " " + " latest trade:\r\n\t" + securityData.getEquitiesTrade());
-                        intrinio.realtime.options.Client.Log(date + " " + " latest quote:\r\n\t" + securityData.getEquitiesQuote());
-                        Map<String, OptionsContractData> contracts = securityData.getAllOptionsContractData();
-                        intrinio.realtime.options.Client.Log(date + " " + " number of contracts: " + contracts.size());
-                        OptionsContractData firstContract = contracts.entrySet().stream().findFirst().map(Map.Entry::getValue).orElse(null);
-                        if (firstContract != null){
-                            intrinio.realtime.options.Client.Log(date + " " + " first contract trade:\r\n\t" + firstContract.getTrade());
-                            intrinio.realtime.options.Client.Log(date + " " + " first contract quote:\r\n\t" + firstContract.getQuote());
-                            intrinio.realtime.options.Client.Log(date + " " + " first contract refresh:\r\n\t" + firstContract.getRefresh());
-                        }
-                    }
+//                    if (securityData != null){
+//                        intrinio.realtime.options.Client.Log(date + " " + " latest trade:\r\n\t" + securityData.getEquitiesTrade());
+//                        intrinio.realtime.options.Client.Log(date + " " + " latest quote:\r\n\t" + securityData.getEquitiesQuote());
+//                        Map<String, OptionsContractData> contracts = securityData.getAllOptionsContractData();
+//                        intrinio.realtime.options.Client.Log(date + " " + " number of contracts: " + contracts.size());
+//                        OptionsContractData firstContract = contracts.entrySet().stream().findFirst().map(Map.Entry::getValue).orElse(null);
+//                        if (firstContract != null){
+//                            intrinio.realtime.options.Client.Log(date + " " + " first contract trade:\r\n\t" + firstContract.getTrade());
+//                            intrinio.realtime.options.Client.Log(date + " " + " first contract quote:\r\n\t" + firstContract.getQuote());
+//                            intrinio.realtime.options.Client.Log(date + " " + " first contract refresh:\r\n\t" + firstContract.getRefresh());
+//                        }
+//                    }
                 }catch (Exception e){
                     System.out.println("Error in summary timer: " + e.getMessage());
                 }

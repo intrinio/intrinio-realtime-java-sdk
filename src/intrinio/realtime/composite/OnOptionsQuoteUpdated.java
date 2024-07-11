@@ -1,5 +1,5 @@
 package intrinio.realtime.composite;
 
 public interface OnOptionsQuoteUpdated {
-    void onOptionsQuoteUpdated(OptionsContractData optionsContractData, CurrentDataCache currentDataCache, CurrentSecurityData currentSecurityData);
+    void onOptionsQuoteUpdated(OptionsContractData OptionsContractData, DataCache DataCache, SecurityData SecurityData);
 }

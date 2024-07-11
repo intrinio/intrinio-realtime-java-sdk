@@ -11,8 +11,8 @@ public class BlackScholesGreekCalculator implements GreekCalculator
     @Override
     public Greek calculate(String contract, CurrentSecurityData calcData, Double riskFreeInterestRate) {
         intrinio.realtime.equities.Trade underlyingTrade = calcData.getEquitiesTrade();
-        intrinio.realtime.options.Trade latestOptionTrade = calcData.getOptionsTrade(contract);
-        intrinio.realtime.options.Quote latestOptionQuote = calcData.getOptionsQuote(contract);
+        intrinio.realtime.options.Trade latestOptionTrade = calcData.getOptionsContractTrade(contract);
+        intrinio.realtime.options.Quote latestOptionQuote = calcData.getOptionsContractQuote(contract);
         if (underlyingTrade == null || latestOptionTrade == null || latestOptionQuote == null)
             return null;
         if (latestOptionQuote.askPrice() <= 0.0 || latestOptionQuote.bidPrice() <= 0.0)
@@ -172,8 +172,8 @@ public class BlackScholesGreekCalculator implements GreekCalculator
         return new Greek(calcData.getTickerSymbol(),
                 contract,
                 calcData.getEquitiesTrade(),
-                calcData.getAllOptionsContractData().get(contract).getLatestTrade(),//latestOptionTrade,
-                calcData.getAllOptionsContractData().get(contract).getLatestQuote(),//latestOptionQuote,
+                calcData.getAllOptionsContractData().get(contract).getTrade(),//latestOptionTrade,
+                calcData.getAllOptionsContractData().get(contract).getQuote(),//latestOptionQuote,
                 riskFreeInterestRate,
                 calcData.getDividendYield(),
                 daysToExpiration,

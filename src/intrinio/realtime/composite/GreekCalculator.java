@@ -1,5 +1,5 @@
 package intrinio.realtime.composite;
 
 public interface GreekCalculator {
-    Greek calculate(String contract, CurrentSecurityData calcData, Double riskFreeInterestRate);
+    Greek calculate(String contract, SecurityData calcData, Double riskFreeInterestRate);
 }

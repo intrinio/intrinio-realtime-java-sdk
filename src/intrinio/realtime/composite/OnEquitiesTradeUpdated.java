@@ -1,5 +1,5 @@
 package intrinio.realtime.composite;
 
 public interface OnEquitiesTradeUpdated {
-    void onEquitiesTradeUpdated(CurrentSecurityData currentSecurityData, CurrentDataCache currentDataCache);
+    void onEquitiesTradeUpdated(SecurityData SecurityData, DataCache DataCache);
 }

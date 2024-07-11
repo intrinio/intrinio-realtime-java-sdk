@@ -3,40 +3,62 @@ package intrinio.realtime.composite;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class CurrentDataCache
+public class CurrentDataCache implements DataCache
 {
     //region Data Members
-    private volatile Double riskFreeInterestRate;
     private final ConcurrentHashMap<String, CurrentSecurityData> data;
-    private final Map<String, CurrentSecurityData> readonlyData;
-    private OnRiskFreeInterestRateUpdated onRiskFreeInterestRateUpdated;
-    private OnDividendYieldUpdated onDividendYieldUpdated;
+    private final Map<String, SecurityData> readonlyData;
+    private OnSupplementalDatumUpdated onSupplementalDatumUpdated;
+    private OnSecuritySupplementalDatumUpdated onSecuritySupplementalDatumUpdated;
+    private OnOptionsContractSupplementalDatumUpdated onOptionsContractSupplementalDatumUpdated;
     private OnEquitiesQuoteUpdated onEquitiesQuoteUpdated;
     private OnEquitiesTradeUpdated onEquitiesTradeUpdated;
     private OnOptionsQuoteUpdated onOptionsQuoteUpdated;
     private OnOptionsTradeUpdated onOptionsTradeUpdated;
+    private final ConcurrentHashMap<String, Double> supplementaryData;
+    private final Map<String, Double> readonlySupplementaryData;
     //endregion Data Members
 
     //region Constructors
     public CurrentDataCache(){
-        riskFreeInterestRate = null;
         this.data = new ConcurrentHashMap<String, CurrentSecurityData>();
         this.readonlyData = java.util.Collections.unmodifiableMap(this.data);
-        this.onRiskFreeInterestRateUpdated = null;
-        this.onDividendYieldUpdated = null;
+        this.onSupplementalDatumUpdated = null;
+        this.onSecuritySupplementalDatumUpdated = null;
+        this.onOptionsContractSupplementalDatumUpdated = null;
         this.onEquitiesQuoteUpdated = null;
         this.onEquitiesTradeUpdated = null;
         this.onOptionsQuoteUpdated = null;
         this.onOptionsTradeUpdated = null;
+        this.supplementaryData = new ConcurrentHashMap<String, Double>();
+        this.readonlySupplementaryData = java.util.Collections.unmodifiableMap(supplementaryData);
     }
     //endregion Constructors
 
     //region Public Methods
-    public CurrentSecurityData getCurrentSecurityData(String tickerSymbol){
+    public Double getsupplementaryDatum(String key){
+        return supplementaryData.getOrDefault(key, null);
+    }
+
+    public boolean setsupplementaryDatum(String key, double datum){
+        boolean isSet = datum == supplementaryData.compute(key, (k, oldValue) -> datum);
+        if (this.onSupplementalDatumUpdated != null){
+            try{
+                this.onSupplementalDatumUpdated.onSupplementalDatumUpdated(key, datum, this);
+            }catch (Exception e){
+                System.out.println("Error in setsupplementaryDatum Callback: " + e.getMessage());
+            }
+        }
+        return isSet;
+    }
+
+    public Map<String, Double> getAllSupplementaryData(){return readonlySupplementaryData;}
+
+    public SecurityData getSecurityData(String tickerSymbol){
         return data.getOrDefault(tickerSymbol, null);
     }
 
-    public Map<String, CurrentSecurityData> getAllCurrentSecurityData(){
+    public Map<String, SecurityData> getAllSecurityData(){
         return readonlyData;
     }
 
@@ -48,13 +70,16 @@ public class CurrentDataCache
 
     public boolean setEquityTrade(intrinio.realtime.equities.Trade trade){
         String symbol = trade.symbol();
-        if (data.containsKey(symbol))
-            return data.get(symbol).setEquitiesTrade(trade);
+        CurrentSecurityData securityData;
+        if (data.containsKey(symbol)){
+            securityData = data.get(symbol);
+        }
         else {
             CurrentSecurityData newData = new CurrentSecurityData(symbol);
             CurrentSecurityData possiblyNewerData = data.putIfAbsent(symbol, newData);
-            return Objects.requireNonNullElse(possiblyNewerData, newData).setEquitiesTrade(trade);
+            securityData = Objects.requireNonNullElse(possiblyNewerData, newData);
         }
+        return securityData.setEquitiesTrade(trade, this.onEquitiesTradeUpdated, this);
     }
 
     public intrinio.realtime.equities.Quote getEquityQuote(String tickerSymbol){
@@ -65,13 +90,16 @@ public class CurrentDataCache
 
     public boolean setEquityQuote(intrinio.realtime.equities.Quote quote){
         String symbol = quote.symbol();
-        if (data.containsKey(symbol))
-            return data.get(symbol).setEquitiesQuote(quote);
+        CurrentSecurityData securityData;
+        if (data.containsKey(symbol)){
+            securityData = data.get(symbol);
+        }
         else {
             CurrentSecurityData newData = new CurrentSecurityData(symbol);
             CurrentSecurityData possiblyNewerData = data.putIfAbsent(symbol, newData);
-            return Objects.requireNonNullElse(possiblyNewerData, newData).setEquitiesQuote(quote);
+            securityData = Objects.requireNonNullElse(possiblyNewerData, newData);
         }
+        return securityData.setEquitiesQuote(quote, this.onEquitiesQuoteUpdated, this);
     }
 
     public OptionsContractData getOptionsContractData(String tickerSymbol, String contract){
@@ -82,92 +110,93 @@ public class CurrentDataCache
 
     public intrinio.realtime.options.Trade getOptionsTrade(String tickerSymbol, String contract){
         if (data.containsKey(tickerSymbol))
-            return data.get(tickerSymbol).getOptionsTrade(contract);
+            return data.get(tickerSymbol).getOptionsContractTrade(contract);
         else return null;
     }
 
     public boolean setOptionsTrade(intrinio.realtime.options.Trade trade){
         String underlyingSymbol = trade.getUnderlyingSymbol();
-        if (data.containsKey(underlyingSymbol))
-            return data.get(underlyingSymbol).setOptionsTrade(trade);
+        CurrentSecurityData securityData;
+        if (data.containsKey(underlyingSymbol)){
+            securityData = data.get(underlyingSymbol);
+        }
         else {
             CurrentSecurityData newData = new CurrentSecurityData(underlyingSymbol);
             CurrentSecurityData possiblyNewerData = data.putIfAbsent(underlyingSymbol, newData);
-            return Objects.requireNonNullElse(possiblyNewerData, newData).setOptionsTrade(trade);
+            securityData = Objects.requireNonNullElse(possiblyNewerData, newData);
         }
+        return securityData.setOptionsTrade(trade, this.onOptionsTradeUpdated, this);
     }
 
     public intrinio.realtime.options.Quote getOptionsQuote(String tickerSymbol, String contract){
         if (data.containsKey(tickerSymbol))
-            return data.get(tickerSymbol).getOptionsQuote(contract);
+            return data.get(tickerSymbol).getOptionsContractQuote(contract);
         else return null;
     }
 
     public boolean setOptionsQuote(intrinio.realtime.options.Quote quote){
         String underlyingSymbol = quote.getUnderlyingSymbol();
-        if (data.containsKey(underlyingSymbol))
-            return data.get(underlyingSymbol).setOptionsQuote(quote);
+        CurrentSecurityData securityData;
+        if (data.containsKey(underlyingSymbol)){
+            securityData = data.get(underlyingSymbol);
+        }
         else {
             CurrentSecurityData newData = new CurrentSecurityData(underlyingSymbol);
             CurrentSecurityData possiblyNewerData = data.putIfAbsent(underlyingSymbol, newData);
-            return Objects.requireNonNullElse(possiblyNewerData, newData).setOptionsQuote(quote);
+            securityData = Objects.requireNonNullElse(possiblyNewerData, newData);
         }
+        return securityData.setOptionsQuote(quote, this.onOptionsQuoteUpdated, this);
     }
 
-    public Double getDividendYield(String tickerSymbol){
+    public Double getSecuritySupplementalDatum(String tickerSymbol, String key){
         if (data.containsKey(tickerSymbol))
-            return data.get(tickerSymbol).getDividendYield();
+            return data.get(tickerSymbol).getSupplementaryDatum(key);
         else return null;
     }
 
-    public boolean setDividendYield(String tickerSymbol, double dividendYield){
+    public boolean setSecuritySupplementalDatum(String tickerSymbol, String key, double datum){
         boolean result = false;
         CurrentSecurityData currentSecurityData;
         if (data.containsKey(tickerSymbol)) {
             currentSecurityData = data.get(tickerSymbol);
-            result = currentSecurityData.setDividendYield(dividendYield);
         }
         else {
             CurrentSecurityData newData = new CurrentSecurityData(tickerSymbol);
             CurrentSecurityData possiblyNewerData = data.putIfAbsent(tickerSymbol, newData);
             currentSecurityData = possiblyNewerData == null ? newData : possiblyNewerData;
-            result = currentSecurityData.setDividendYield(dividendYield);
         }
-        if (this.onDividendYieldUpdated != null){
-            try{
-                this.onDividendYieldUpdated.onDividendYieldUpdated(dividendYield, currentSecurityData, this);
-            }catch (Exception e){
-                System.out.println("Error in onRiskFreeInterestRateUpdated Callback: " + e.getMessage());
-            }
+        return currentSecurityData.setSupplementaryDatum(key, datum, this.onSecuritySupplementalDatumUpdated, this);
+    }
+
+    public Double getOptionsContractSupplementalDatum(String tickerSymbol, String contract, String key){
+        if (data.containsKey(tickerSymbol))
+            return data.get(tickerSymbol).getOptionsContractSupplementalDatum(contract, key);
+        else return null;
+    }
+
+    public boolean setOptionSupplementalDatum(String tickerSymbol, String contract, String key, double datum){
+        CurrentSecurityData currentSecurityData;
+        if (data.containsKey(tickerSymbol)) {
+            currentSecurityData = data.get(tickerSymbol);
         }
-        return result;
-    }
-
-    public Double getRiskFreeInterestRate(){
-        return this.riskFreeInterestRate;
-    }
-
-    public boolean setRiskFreeInterestRate(double riskFreeInterestRate){
-        if (!Double.isNaN(riskFreeInterestRate) && !Double.isInfinite(riskFreeInterestRate)) {
-            this.riskFreeInterestRate = riskFreeInterestRate;
-            if (this.onRiskFreeInterestRateUpdated != null){
-                try{
-                    this.onRiskFreeInterestRateUpdated.onRiskFreeInterestRateUpdated(riskFreeInterestRate, this);
-                }catch (Exception e){
-                    System.out.println("Error in onRiskFreeInterestRateUpdated Callback: " + e.getMessage());
-                }
-            }
-            return true;
+        else {
+            CurrentSecurityData newData = new CurrentSecurityData(tickerSymbol);
+            CurrentSecurityData possiblyNewerData = data.putIfAbsent(tickerSymbol, newData);
+            currentSecurityData = possiblyNewerData == null ? newData : possiblyNewerData;
         }
-        else return false;
+        return currentSecurityData.setOptionsContractSupplementalDatum(contract, key, datum, onOptionsContractSupplementalDatumUpdated, this);
     }
 
-    public void setOnRiskFreeInterestRateUpdated(OnRiskFreeInterestRateUpdated onRiskFreeInterestRateUpdated){
-        this.onRiskFreeInterestRateUpdated = onRiskFreeInterestRateUpdated;
+    public void setOnSupplementalDatumUpdated(OnSupplementalDatumUpdated onSupplementalDatumUpdated){
+        this.onSupplementalDatumUpdated = onSupplementalDatumUpdated;
     }
 
-    public void setOnDividendYieldUpdated(OnDividendYieldUpdated onDividendYieldUpdated){
-        this.onDividendYieldUpdated = onDividendYieldUpdated;
+    public void setOnSecuritySupplementalDatumUpdated(OnSecuritySupplementalDatumUpdated onSecuritySupplementalDatumUpdated){
+        this.onSecuritySupplementalDatumUpdated = onSecuritySupplementalDatumUpdated;
+    }
+
+    public void setOnOptionSupplementalDatumUpdated(OnOptionsContractSupplementalDatumUpdated onOptionsContractSupplementalDatumUpdated){
+        this.onOptionsContractSupplementalDatumUpdated = onOptionsContractSupplementalDatumUpdated;
     }
 
     public void setOnEquitiesQuoteUpdated(OnEquitiesQuoteUpdated onEquitiesQuoteUpdated){

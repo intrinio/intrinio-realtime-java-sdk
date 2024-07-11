@@ -134,7 +134,7 @@ public class GreekClient
     }
 
     public Greek getGreek(String ticker, String contract){
-        CurrentSecurityData calcData = data.getCurrentSecurityData(ticker);
+        CurrentSecurityData calcData = data.getSecurityData(ticker);
         if (calcData == null)
             return null;
         Greek greek = greekCalculator.calculate(contract, calcData, data.getRiskFreeInterestRate());
@@ -264,7 +264,7 @@ public class GreekClient
                 try
                 {
                     double dividendYield = fetchDividendYield(ticker);
-                    data.setDividendYield(ticker, dividendYield);
+                    data.setSecuritySupplementalDatum(ticker, dividendYield);
                 }
                 catch (Exception ex){
                     Log(String.format("Error fetching dividend yield rate for ticker %s: %s", ticker, ex.getMessage()));
@@ -293,7 +293,7 @@ public class GreekClient
                 if (trade != null){
                     String symbol = trade.symbol();
                     addDividendYieldTimerTask(symbol);
-                    CurrentSecurityData calcData = data.getCurrentSecurityData(symbol);
+                    CurrentSecurityData calcData = data.getSecurityData(symbol);
                     calcData.setEquitiesTrade(trade);
                     if (notifyOnEquityTrade){
                         for (String contract : calcData.getAllOptionsContractData().keySet()){
@@ -316,8 +316,8 @@ public class GreekClient
                 if (trade != null){
                     String symbol = trade.getUnderlyingSymbol();
                     addDividendYieldTimerTask(symbol);
-                    CurrentSecurityData calcData = data.getCurrentSecurityData(symbol);
-                    calcData.setOptionsTrade(trade);
+                    CurrentSecurityData calcData = data.getSecurityData(symbol);
+                    calcData.setOptionsContractTrade(trade);
                     if (notifyOnOptionTrade){
                         FireGreek(calcData, trade.contract());
                     }
@@ -337,8 +337,8 @@ public class GreekClient
                 if (quote != null){
                     String symbol = quote.getUnderlyingSymbol();
                     addDividendYieldTimerTask(symbol);
-                    CurrentSecurityData calcData = data.getCurrentSecurityData(symbol);
-                    calcData.setOptionsQuote(quote);
+                    CurrentSecurityData calcData = data.getSecurityData(symbol);
+                    calcData.setOptionsContractQuote(quote);
                     if (notifyOnOptionQuote){
                         FireGreek(calcData, quote.contract());
                     }

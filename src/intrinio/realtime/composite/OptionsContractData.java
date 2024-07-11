@@ -1,43 +1,22 @@
 package intrinio.realtime.composite;
 
-public class OptionsContractData {
-    private final String contract;
-    private volatile intrinio.realtime.options.Trade latestTrade;
-    private volatile intrinio.realtime.options.Quote latestQuote;
+import java.util.Map;
 
-    public OptionsContractData(String contract, intrinio.realtime.options.Trade latestTrade, intrinio.realtime.options.Quote latestQuote){
-        this.contract = contract;
-        this.latestTrade = latestTrade;
-        this.latestQuote = latestQuote;
-    }
+public interface OptionsContractData {
 
-    public String getContract(){
-        return this.contract;
-    }
+    String getContract();
 
-    public intrinio.realtime.options.Trade getLatestTrade(){
-        return this.latestTrade;
-    }
+    intrinio.realtime.options.Trade getTrade();
 
-    public intrinio.realtime.options.Quote getLatestQuote(){
-        return this.latestQuote;
-    }
+    intrinio.realtime.options.Quote getQuote();
 
-    public boolean setLatestTrade(intrinio.realtime.options.Trade trade){
-        //dirty set
-        if ((latestTrade == null) || (trade.timestamp() > latestTrade.timestamp())) {
-            latestTrade = trade;
-            return true;
-        }
-        return false;
-    }
+    boolean setTrade(intrinio.realtime.options.Trade trade);
 
-    public boolean setLatestQuote(intrinio.realtime.options.Quote quote){
-        //dirty set
-        if ((latestQuote == null) || (quote.timestamp() > latestQuote.timestamp())) {
-            latestQuote = quote;
-            return true;
-        }
-        return false;
-    }
+    boolean setQuote(intrinio.realtime.options.Quote quote);
+
+    Double getSupplementaryDatum(String key);
+
+    boolean setSupplementaryDatum(String key, double datum);
+
+    Map<String, Double> getAllSupplementaryData();
 }

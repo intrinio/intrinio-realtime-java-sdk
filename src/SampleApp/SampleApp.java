@@ -5,6 +5,6 @@ public class SampleApp {
 	{
 		//EquitiesSampleApp.run(args);
 		//OptionsSampleApp.run(args);
-		GreekSampleApp.run(args);
+		CompositeSampleApp.run(args);
 	}
 }

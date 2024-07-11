@@ -1,26 +1,22 @@
 package SampleApp;
 
-import intrinio.realtime.composite.CurrentDataCache;
-import intrinio.realtime.composite.GreekCalculationMethod;
+import intrinio.realtime.composite.*;
 import intrinio.realtime.composite.GreekClient;
-import intrinio.realtime.composite.RefreshPeriod;
-import intrinio.realtime.options.Config;
-import intrinio.realtime.options.Provider;
 
-import java.io.Console;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 
-public class GreekSampleApp {
+public class CompositeSampleApp {
     public static void run(String[] args){
         String apiKey = "API_KEY_HERE";
+        String tickerSymbol = "NVDA";
 
         intrinio.realtime.options.Config optionsConfig = null;
         try{
-            optionsConfig = new intrinio.realtime.options.Config(apiKey, intrinio.realtime.options.Provider.OPRA, null, new String[]{"NVDA"}, 8);
+            optionsConfig = new intrinio.realtime.options.Config(apiKey, intrinio.realtime.options.Provider.OPRA, null, new String[]{tickerSymbol}, 8);
         }catch (Exception e){
             System.out.println("Error parsing options config: " + e.getMessage());
             return;
@@ -28,7 +24,7 @@ public class GreekSampleApp {
 
         intrinio.realtime.equities.Config equitiesConfig = null;
         try{
-            equitiesConfig = new intrinio.realtime.equities.Config(apiKey, intrinio.realtime.equities.Provider.NASDAQ_BASIC, null, new String[]{"NVDA"}, true, 4);
+            equitiesConfig = new intrinio.realtime.equities.Config(apiKey, intrinio.realtime.equities.Provider.NASDAQ_BASIC, null, new String[]{tickerSymbol}, true, 4);
         }catch (Exception e){
             System.out.println("Error parsing equities config: " + e.getMessage());
             return;
@@ -36,33 +32,20 @@ public class GreekSampleApp {
 
         intrinio.realtime.composite.DataCache currentDataCache = new CurrentDataCache();
 
-        //Greek Client
-        GreekClient greekClient = new GreekClient(currentDataCache,
-                (intrinio.realtime.composite.Greek greek) -> {System.out.println(greek);},
-                GreekCalculationMethod.BLACK_SCHOLES,
-                apiKey,
-                null,
-                RefreshPeriod.ONE_DAY,
-                RefreshPeriod.ONE_DAY,
-                true,
-                true,
-                false,
-                3,
-                4,
-                4);
-
-        //Options Client
-        intrinio.realtime.options.OnTrade optionsTradeHandler = greekClient::onOptionsTrade;
-        intrinio.realtime.options.OnQuote optionsQuoteHandler = greekClient::onOptionsQuote;
-        intrinio.realtime.options.OnRefresh optionsRefreshHandler = null;
+        //Initialize Options Client and wire it to the cache
+        intrinio.realtime.options.OnTrade optionsTradeHandler = currentDataCache::setOptionsTrade;
+        intrinio.realtime.options.OnQuote optionsQuoteHandler = currentDataCache::setOptionsQuote;
+        intrinio.realtime.options.OnRefresh optionsRefreshHandler = currentDataCache::setOptionsRefresh;
         intrinio.realtime.options.OnUnusualActivity optionsUnusualActivityHandler = null;
         intrinio.realtime.options.Client optionsClient = new intrinio.realtime.options.Client(optionsConfig);
         optionsClient.setOnTrade(optionsTradeHandler);
         optionsClient.setOnQuote(optionsQuoteHandler);
+        optionsClient.setOnRefresh(optionsRefreshHandler);
+        //optionsClient.setOnUnusualActivity(optionsUnusualActivityHandler);
 
-        //Equities Client
-        intrinio.realtime.equities.OnTrade equitiesTradeHandler = greekClient::onEquitiesTrade;
-        intrinio.realtime.equities.OnQuote equitiesQuoteHandler = null;
+        //Initialize Equities Client and wire it to the cache
+        intrinio.realtime.equities.OnTrade equitiesTradeHandler = currentDataCache::setEquityTrade;
+        intrinio.realtime.equities.OnQuote equitiesQuoteHandler = currentDataCache::setEquityQuote;
         intrinio.realtime.equities.Client equitiesClient = new intrinio.realtime.equities.Client(equitiesTradeHandler, equitiesQuoteHandler, equitiesConfig);
 
         Runtime.getRuntime().addShutdownHook(new Thread( new Runnable() {
@@ -72,12 +55,10 @@ public class GreekSampleApp {
                 optionsClient.stop();
                 equitiesClient.leave();
                 equitiesClient.stop();
-                greekClient.stop();
             }
         }));
 
         try{
-            greekClient.start();
             equitiesClient.start();
             //equitiesClient.joinLobby();
             equitiesClient.join();
@@ -97,6 +78,15 @@ public class GreekSampleApp {
                     String date = dtf.format(now);
                     intrinio.realtime.options.Client.Log(date + " " + optionsClient.getStats());
                     intrinio.realtime.equities.Client.Log(date + " " + equitiesClient.getStats());
+                    SecurityData securityData = currentDataCache.getSecurityData(tickerSymbol);
+                    intrinio.realtime.options.Client.Log(date + " " + tickerSymbol + " latest trade:\r\n\t" + securityData.getEquitiesTrade());
+                    intrinio.realtime.options.Client.Log(date + " " + tickerSymbol + " latest quote:\r\n\t" + securityData.getEquitiesQuote());
+                    Map<String, OptionsContractData> contracts = securityData.getAllOptionsContractData();
+                    intrinio.realtime.options.Client.Log(date + " " + tickerSymbol + " number of contracts: " + contracts.size());
+                    OptionsContractData firstContract = contracts.entrySet().stream().findFirst().map(Map.Entry::getValue).orElse(null);
+                    intrinio.realtime.options.Client.Log(date + " " + tickerSymbol + " first contract trade:\r\n\t" + firstContract.getTrade());
+                    intrinio.realtime.options.Client.Log(date + " " + tickerSymbol + " first contract quote:\r\n\t" + firstContract.getQuote());
+                    intrinio.realtime.options.Client.Log(date + " " + tickerSymbol + " first contract refresh:\r\n\t" + firstContract.getRefresh());
                 }catch (Exception e){
                     System.out.println("Error in summary timer: " + e.getMessage());
                 }

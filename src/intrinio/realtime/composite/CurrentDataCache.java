@@ -3,6 +3,11 @@ package intrinio.realtime.composite;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * This is a simple thread-safe non-transactional cache intended to store the most recent data for an event type.
+ * The on-updated events do not clone data before returning, so will always represent the newest data, even if it's
+ * changed before you process it.
+ */
 public class CurrentDataCache implements DataCache
 {
     //region Data Members

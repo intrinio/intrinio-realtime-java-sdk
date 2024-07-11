@@ -14,7 +14,7 @@ public class CompositeSampleApp {
 
         intrinio.realtime.options.Config optionsConfig = null;
         try{
-            optionsConfig = new intrinio.realtime.options.Config(apiKey, intrinio.realtime.options.Provider.OPRA, null, new String[]{"MSFT", "NVDA", "AAPL"}, 8, true);
+            optionsConfig = new intrinio.realtime.options.Config(apiKey, intrinio.realtime.options.Provider.OPRA, null, new String[]{"MSFT", "NVDA", "AAPL"}, 8, false);
         }catch (Exception e){
             System.out.println("Error parsing options config: " + e.getMessage());
             return;
@@ -28,6 +28,7 @@ public class CompositeSampleApp {
             return;
         }
 
+        //store the most recent values in a simple non-transactional cache that gives contextual information with the event.
         intrinio.realtime.composite.DataCache currentDataCache = new CurrentDataCache();
 
         //Initialize Options Client and wire it to the cache
@@ -45,6 +46,11 @@ public class CompositeSampleApp {
         intrinio.realtime.equities.OnTrade equitiesTradeHandler = currentDataCache::setEquityTrade;
         intrinio.realtime.equities.OnQuote equitiesQuoteHandler = currentDataCache::setEquityQuote;
         intrinio.realtime.equities.Client equitiesClient = new intrinio.realtime.equities.Client(equitiesTradeHandler, equitiesQuoteHandler, equitiesConfig);
+
+        //Display trade events with context
+        currentDataCache.setOnEquitiesTradeUpdated((SecurityData securityData, DataCache dataCache) -> {
+            intrinio.realtime.equities.Client.Log(securityData.getTickerSymbol() + " had a trade and also has " + securityData.getAllOptionsContractData().size() + " active contracts");
+        });
 
         Runtime.getRuntime().addShutdownHook(new Thread( new Runnable() {
             public void run() {

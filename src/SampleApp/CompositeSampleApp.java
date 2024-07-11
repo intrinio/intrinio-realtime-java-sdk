@@ -1,7 +1,6 @@
 package SampleApp;
 
 import intrinio.realtime.composite.*;
-import intrinio.realtime.composite.GreekClient;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;

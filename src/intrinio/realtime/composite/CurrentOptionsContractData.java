@@ -7,13 +7,15 @@ public class CurrentOptionsContractData implements OptionsContractData {
     private final String contract;
     private volatile intrinio.realtime.options.Trade latestTrade;
     private volatile intrinio.realtime.options.Quote latestQuote;
+    private volatile intrinio.realtime.options.Refresh latestRefresh;
     private final ConcurrentHashMap<String, Double> supplementaryData;
     private final Map<String, Double> readonlySupplementaryData;
 
-    public CurrentOptionsContractData(String contract, intrinio.realtime.options.Trade latestTrade, intrinio.realtime.options.Quote latestQuote){
+    public CurrentOptionsContractData(String contract, intrinio.realtime.options.Trade latestTrade, intrinio.realtime.options.Quote latestQuote, intrinio.realtime.options.Refresh latestRefresh){
         this.contract = contract;
         this.latestTrade = latestTrade;
         this.latestQuote = latestQuote;
+        this.latestRefresh = latestRefresh;
         this.supplementaryData = new ConcurrentHashMap<String, Double>();
         this.readonlySupplementaryData = java.util.Collections.unmodifiableMap(supplementaryData);
     }
@@ -28,6 +30,10 @@ public class CurrentOptionsContractData implements OptionsContractData {
 
     public intrinio.realtime.options.Quote getQuote(){
         return this.latestQuote;
+    }
+
+    public intrinio.realtime.options.Refresh getRefresh(){
+        return this.latestRefresh;
     }
 
     public boolean setTrade(intrinio.realtime.options.Trade trade){
@@ -67,6 +73,23 @@ public class CurrentOptionsContractData implements OptionsContractData {
                 onOptionsQuoteUpdated.onOptionsQuoteUpdated(this, dataCache, securityData);
             }catch (Exception e){
                 System.out.println("Error in onOptionsQuoteUpdated Callback: " + e.getMessage());
+            }
+        }
+        return isSet;
+    }
+
+    public boolean setRefresh(intrinio.realtime.options.Refresh refresh){
+        latestRefresh = refresh;
+        return true;
+    }
+
+    boolean setRefresh(intrinio.realtime.options.Refresh refresh, OnOptionsRefreshUpdated onOptionsRefreshUpdated, SecurityData securityData, DataCache dataCache){
+        boolean isSet = this.setRefresh(refresh);
+        if (isSet && onOptionsRefreshUpdated != null){
+            try{
+                onOptionsRefreshUpdated.onOptionsRefreshUpdated(this, dataCache, securityData);
+            }catch (Exception e){
+                System.out.println("Error in onOptionsRefreshUpdated Callback: " + e.getMessage());
             }
         }
         return isSet;

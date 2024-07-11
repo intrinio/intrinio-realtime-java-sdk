@@ -10,9 +10,13 @@ public interface OptionsContractData {
 
     intrinio.realtime.options.Quote getQuote();
 
+    intrinio.realtime.options.Refresh getRefresh();
+
     boolean setTrade(intrinio.realtime.options.Trade trade);
 
     boolean setQuote(intrinio.realtime.options.Quote quote);
+
+    boolean setRefresh(intrinio.realtime.options.Refresh refresh);
 
     Double getSupplementaryDatum(String key);
 

@@ -32,6 +32,10 @@ public interface DataCache
 
     boolean setOptionsQuote(intrinio.realtime.options.Quote quote);
 
+    intrinio.realtime.options.Refresh getOptionsRefresh(String tickerSymbol, String contract);
+
+    boolean setOptionsRefresh(intrinio.realtime.options.Refresh refresh);
+
     Double getSecuritySupplementalDatum(String tickerSymbol, String key);
 
     boolean setSecuritySupplementalDatum(String tickerSymbol, String key, double datum);
@@ -53,4 +57,6 @@ public interface DataCache
     void setOnOptionsQuoteUpdated(OnOptionsQuoteUpdated onOptionsQuoteUpdated);
 
     void setOnOptionsTradeUpdated(OnOptionsTradeUpdated onOptionsTradeUpdated);
+
+    void setOnOptionsRefreshUpdated(OnOptionsRefreshUpdated onOptionsRefreshUpdated);
 }

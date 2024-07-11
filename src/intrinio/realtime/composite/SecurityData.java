@@ -35,6 +35,10 @@ public interface SecurityData {
 
     boolean setOptionsContractQuote(intrinio.realtime.options.Quote quote);
 
+    intrinio.realtime.options.Refresh getOptionsContractRefresh(String contract);
+
+    boolean setOptionsContractRefresh(intrinio.realtime.options.Refresh refresh);
+
     Double getOptionsContractSupplementalDatum(String contract, String key);
 
     boolean setOptionsContractSupplementalDatum(String contract, String key, double datum);

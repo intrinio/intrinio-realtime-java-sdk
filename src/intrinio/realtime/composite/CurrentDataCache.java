@@ -15,6 +15,7 @@ public class CurrentDataCache implements DataCache
     private OnEquitiesTradeUpdated onEquitiesTradeUpdated;
     private OnOptionsQuoteUpdated onOptionsQuoteUpdated;
     private OnOptionsTradeUpdated onOptionsTradeUpdated;
+    private OnOptionsRefreshUpdated onOptionsRefreshUpdated;
     private final ConcurrentHashMap<String, Double> supplementaryData;
     private final Map<String, Double> readonlySupplementaryData;
     //endregion Data Members
@@ -30,6 +31,7 @@ public class CurrentDataCache implements DataCache
         this.onEquitiesTradeUpdated = null;
         this.onOptionsQuoteUpdated = null;
         this.onOptionsTradeUpdated = null;
+        this.onOptionsRefreshUpdated = null;
         this.supplementaryData = new ConcurrentHashMap<String, Double>();
         this.readonlySupplementaryData = java.util.Collections.unmodifiableMap(supplementaryData);
     }
@@ -148,6 +150,26 @@ public class CurrentDataCache implements DataCache
         return securityData.setOptionsQuote(quote, this.onOptionsQuoteUpdated, this);
     }
 
+    public intrinio.realtime.options.Refresh getOptionsRefresh(String tickerSymbol, String contract){
+        if (data.containsKey(tickerSymbol))
+            return data.get(tickerSymbol).getOptionsContractRefresh(contract);
+        else return null;
+    }
+
+    public boolean setOptionsRefresh(intrinio.realtime.options.Refresh refresh){
+        String underlyingSymbol = refresh.getUnderlyingSymbol();
+        CurrentSecurityData securityData;
+        if (data.containsKey(underlyingSymbol)){
+            securityData = data.get(underlyingSymbol);
+        }
+        else {
+            CurrentSecurityData newData = new CurrentSecurityData(underlyingSymbol);
+            CurrentSecurityData possiblyNewerData = data.putIfAbsent(underlyingSymbol, newData);
+            securityData = Objects.requireNonNullElse(possiblyNewerData, newData);
+        }
+        return securityData.setOptionsRefresh(refresh, this.onOptionsRefreshUpdated, this);
+    }
+
     public Double getSecuritySupplementalDatum(String tickerSymbol, String key){
         if (data.containsKey(tickerSymbol))
             return data.get(tickerSymbol).getSupplementaryDatum(key);
@@ -213,6 +235,10 @@ public class CurrentDataCache implements DataCache
 
     public void setOnOptionsTradeUpdated(OnOptionsTradeUpdated onOptionsTradeUpdated){
         this.onOptionsTradeUpdated = onOptionsTradeUpdated;
+    }
+
+    public void setOnOptionsRefreshUpdated(OnOptionsRefreshUpdated onOptionsRefreshUpdated){
+        this.onOptionsRefreshUpdated = onOptionsRefreshUpdated;
     }
     //endregion Public Methods
 

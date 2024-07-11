@@ -122,7 +122,7 @@ public class CurrentSecurityData implements SecurityData{
             return contracts.get(trade.contract()).setTrade(trade);
         }
         else{
-            CurrentOptionsContractData data = new CurrentOptionsContractData(trade.contract(), trade, null);
+            CurrentOptionsContractData data = new CurrentOptionsContractData(trade.contract(), trade, null, null);
             CurrentOptionsContractData possiblyNewerData = contracts.putIfAbsent(trade.contract(), data);
             if (possiblyNewerData != null)
                 return possiblyNewerData.setTrade(trade);
@@ -137,7 +137,7 @@ public class CurrentSecurityData implements SecurityData{
             currentOptionsContractData = contracts.get(contract);
         }
         else {
-            CurrentOptionsContractData newData = new CurrentOptionsContractData(contract, null, null);
+            CurrentOptionsContractData newData = new CurrentOptionsContractData(contract, trade, null, null);
             CurrentOptionsContractData possiblyNewerData = contracts.putIfAbsent(contract, newData);
             currentOptionsContractData = possiblyNewerData == null ? newData : possiblyNewerData;
         }
@@ -156,7 +156,7 @@ public class CurrentSecurityData implements SecurityData{
             return contracts.get(quote.contract()).setQuote(quote);
         }
         else{
-            CurrentOptionsContractData data = new CurrentOptionsContractData(quote.contract(), null, quote);
+            CurrentOptionsContractData data = new CurrentOptionsContractData(quote.contract(), null, quote, null);
             CurrentOptionsContractData possiblyNewerData = contracts.putIfAbsent(quote.contract(), data);
             if (possiblyNewerData != null)
                 return possiblyNewerData.setQuote(quote);
@@ -171,11 +171,46 @@ public class CurrentSecurityData implements SecurityData{
             currentOptionsContractData = contracts.get(contract);
         }
         else {
-            CurrentOptionsContractData newData = new CurrentOptionsContractData(contract, null, null);
+            CurrentOptionsContractData newData = new CurrentOptionsContractData(contract, null, quote, null);
             CurrentOptionsContractData possiblyNewerData = contracts.putIfAbsent(contract, newData);
             currentOptionsContractData = possiblyNewerData == null ? newData : possiblyNewerData;
         }
         return currentOptionsContractData.setQuote(quote, onOptionsQuoteUpdated, this, dataCache);
+    }
+
+    public intrinio.realtime.options.Refresh getOptionsContractRefresh(String contract){
+        if (contracts.containsKey(contract))
+            return contracts.get(contract).getRefresh();
+        else return null;
+    }
+
+    public boolean setOptionsContractRefresh(intrinio.realtime.options.Refresh refresh){
+        //dirty set
+        String contract = refresh.contract();
+        if (contracts.containsKey(contract)){
+            return contracts.get(contract).setRefresh(refresh);
+        }
+        else{
+            CurrentOptionsContractData data = new CurrentOptionsContractData(contract, null, null, refresh);
+            CurrentOptionsContractData possiblyNewerData = contracts.putIfAbsent(contract, data);
+            if (possiblyNewerData != null)
+                return possiblyNewerData.setRefresh(refresh);
+            return true;
+        }
+    }
+
+    public boolean setOptionsRefresh(intrinio.realtime.options.Refresh refresh, OnOptionsRefreshUpdated onOptionsRefreshUpdated, DataCache dataCache){
+        CurrentOptionsContractData currentOptionsContractData;
+        String contract = refresh.contract();
+        if (contracts.containsKey(contract)) {
+            currentOptionsContractData = contracts.get(contract);
+        }
+        else {
+            CurrentOptionsContractData newData = new CurrentOptionsContractData(contract, null, null, refresh);
+            CurrentOptionsContractData possiblyNewerData = contracts.putIfAbsent(contract, newData);
+            currentOptionsContractData = possiblyNewerData == null ? newData : possiblyNewerData;
+        }
+        return currentOptionsContractData.setRefresh(refresh, onOptionsRefreshUpdated, this, dataCache);
     }
 
     public Double getOptionsContractSupplementalDatum(String contract, String key){
@@ -190,7 +225,7 @@ public class CurrentSecurityData implements SecurityData{
             currentOptionsContractData = contracts.get(contract);
         }
         else {
-            CurrentOptionsContractData newData = new CurrentOptionsContractData(contract, null, null);
+            CurrentOptionsContractData newData = new CurrentOptionsContractData(contract, null, null, null);
             CurrentOptionsContractData possiblyNewerData = contracts.putIfAbsent(contract, newData);
             currentOptionsContractData = possiblyNewerData == null ? newData : possiblyNewerData;
         }
@@ -203,7 +238,7 @@ public class CurrentSecurityData implements SecurityData{
             currentOptionsContractData = contracts.get(contract);
         }
         else {
-            CurrentOptionsContractData newData = new CurrentOptionsContractData(contract, null, null);
+            CurrentOptionsContractData newData = new CurrentOptionsContractData(contract, null, null, null);
             CurrentOptionsContractData possiblyNewerData = contracts.putIfAbsent(contract, newData);
             currentOptionsContractData = possiblyNewerData == null ? newData : possiblyNewerData;
         }

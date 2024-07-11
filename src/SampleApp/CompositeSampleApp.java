@@ -14,7 +14,7 @@ public class CompositeSampleApp {
 
         intrinio.realtime.options.Config optionsConfig = null;
         try{
-            optionsConfig = new intrinio.realtime.options.Config(apiKey, intrinio.realtime.options.Provider.OPRA, null, new String[]{"MSFT", "NVDA", "AAPL"}, 8, false);
+            optionsConfig = new intrinio.realtime.options.Config(apiKey, intrinio.realtime.options.Provider.OPRA, null, new String[]{"MSFT", "NVDA", "AAPL"}, 8, true);
         }catch (Exception e){
             System.out.println("Error parsing options config: " + e.getMessage());
             return;
@@ -22,7 +22,7 @@ public class CompositeSampleApp {
 
         intrinio.realtime.equities.Config equitiesConfig = null;
         try{
-            equitiesConfig = new intrinio.realtime.equities.Config(apiKey, intrinio.realtime.equities.Provider.NASDAQ_BASIC, null, new String[0], true, 4);
+            equitiesConfig = new intrinio.realtime.equities.Config(apiKey, intrinio.realtime.equities.Provider.NASDAQ_BASIC, null, new String[]{"MSFT", "NVDA", "AAPL"}, true, 4);
         }catch (Exception e){
             System.out.println("Error parsing equities config: " + e.getMessage());
             return;

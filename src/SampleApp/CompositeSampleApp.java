@@ -14,7 +14,7 @@ public class CompositeSampleApp {
 
         intrinio.realtime.options.Config optionsConfig = null;
         try{
-            optionsConfig = new intrinio.realtime.options.Config(apiKey, intrinio.realtime.options.Provider.OPRA, null, new String[0], 8);
+            optionsConfig = new intrinio.realtime.options.Config(apiKey, intrinio.realtime.options.Provider.OPRA, null, new String[]{"MSFT", "NVDA", "AAPL"}, 8, false);
         }catch (Exception e){
             System.out.println("Error parsing options config: " + e.getMessage());
             return;
@@ -58,11 +58,11 @@ public class CompositeSampleApp {
 
         try{
             equitiesClient.start();
-            equitiesClient.joinLobby();
-            //equitiesClient.join();
+            //equitiesClient.joinLobby();
+            equitiesClient.join();
             optionsClient.start();
-            optionsClient.joinLobby();
-            //optionsClient.join();
+            //optionsClient.joinLobby();
+            optionsClient.join();
         }catch (Exception e) {
             e.printStackTrace();
         }

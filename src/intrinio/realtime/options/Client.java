@@ -133,9 +133,9 @@ public class Client implements WebSocket.Listener {
 	private String getWebSocketUrl (String token) throws Exception {
 		String wsUrl;
 		switch (config.getOptionsProvider()) {
-			case OPRA: wsUrl = "wss://realtime-options.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
+			case OPRA: wsUrl = "wss://realtime-options.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + (this.config.isDelayed() ? "&delayed=true" : "");
 				break;
-			case MANUAL: wsUrl = "ws://" + config.getOptionsIpAddress() + "/socket/websocket?vsn=1.0.0&token=" + token;
+			case MANUAL: wsUrl = "ws://" + config.getOptionsIpAddress() + "/socket/websocket?vsn=1.0.0&token=" + token + (this.config.isDelayed() ? "&delayed=true" : "");
 				break;
 			default: throw new Exception("Provider not specified!");
 		}

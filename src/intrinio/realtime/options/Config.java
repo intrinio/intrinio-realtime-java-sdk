@@ -15,13 +15,15 @@ public class Config {
 	private String optionsIpAddress;
 	private String[] optionsSymbols;
 	private int optionsNumThreads = 4;
+	private boolean delayed = false;
 	
-	public Config(String optionsApiKey, Provider optionsProvider, String optionsIpAddress, String[] optionsSymbols, int optionsNumThreads) throws Exception {
+	public Config(String optionsApiKey, Provider optionsProvider, String optionsIpAddress, String[] optionsSymbols, int optionsNumThreads, boolean delayed) throws Exception {
 		this.optionsApiKey = optionsApiKey;
 		this.optionsProvider = optionsProvider;
 		this.optionsIpAddress = optionsIpAddress;
 		this.optionsSymbols = optionsSymbols;
 		this.optionsNumThreads = optionsNumThreads;
+		this.delayed = delayed;
 		
 		if (this.optionsApiKey.isBlank()) {
 			throw new Exception("You must provide a valid API key");
@@ -53,12 +55,15 @@ public class Config {
 	public int getOptionsNumThreads() {
 		return optionsNumThreads;
 	}
+
+	public boolean isDelayed() { return delayed; }
 	
 	public String toString() {
-		return String.format("apiKey = %s, provider = %s, ipAddress = %s, symbols = %s, numThreads = %d",
+		return String.format("apiKey = %s, provider = %s, ipAddress = %s, delayed = %s, symbols = %s, numThreads = %d",
 				this.optionsApiKey,
 				this.optionsProvider,
 				this.optionsIpAddress,
+				this.delayed,
 				(this.optionsSymbols == null ? "[]" : "[ " + String.join(", ", this.optionsSymbols) + " ]"),
 				this.optionsNumThreads);
 	}

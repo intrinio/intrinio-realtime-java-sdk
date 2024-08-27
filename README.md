@@ -1,7 +1,7 @@
 # Intrinio Java SDK for Real-Time Stock Prices
-SDK for working with Intrinio's realtime IEX, NASDAQ Basic, delayed SIP prices, and [OPRA](https://www.opraplan.com/) options feeds.
+SDK for working with Intrinio's realtime IEX, NASDAQ Basic, delayed SIP prices, and realtime/delayed [OPRA](https://www.opraplan.com/) options feeds.
 
-[Intrinio](https://intrinio.com/) provides real-time stock prices via a two-way WebSocket connection. To get started, [subscribe to a real-time data feed](https://docs.intrinio.com/tutorial/websocket) and follow the instructions below.
+[Intrinio](https://intrinio.com/) provides real-time and delayed stock prices via a two-way WebSocket connection. To get started, [subscribe to a real-time data feed](https://docs.intrinio.com/tutorial/websocket) and follow the instructions below.
 
 ## Programming Language Requirements
 
@@ -50,19 +50,19 @@ For a sample Java project see: [intrinio-realtime-java-sdk](https://github.com/i
 
 ## Features
 
-* Receive streaming, real-time equities price quotes (trades, bid, ask)
-* Receive streaming, real-time options price quotes (trades, conflated bid/ask, unusual activity (block trades, sweeps, whale trades, unusual sweeps), open interest, open, close, high, low)
+* Receive streaming, real-time or delayed equities price quotes (trades, bid, ask)
+* Receive streaming, real-time or delayed options price quotes (trades, conflated bid/ask, unusual activity (block trades, sweeps, whale trades, unusual sweeps), open interest, open, close, high, low)
 * Subscribe to updates from individual securities/chains/contracts, or
-* Subscribe to updates for all securities (lobby)
+* Subscribe to updates for all securities/contracts (lobby)
 
 ## Equities Example Usage
 * See [Equities Sample Websocket](https://github.com/intrinio/intrinio-realtime-java-sdk/blob/master/src/SampleApp/EquitiesSampleApp.java) and [Sample Websocket](https://github.com/intrinio/intrinio-realtime-java-sdk/blob/master/src/SampleApp/SampleApp.java)
 
 ## Options Example Usage
-* See [Equities Sample Websocket](https://github.com/intrinio/intrinio-realtime-java-sdk/blob/master/src/SampleApp/OptionsSampleApp.java) and [Sample Websocket](https://github.com/intrinio/intrinio-realtime-java-sdk/blob/master/src/SampleApp/SampleApp.java)
+* See [Options Sample Websocket](https://github.com/intrinio/intrinio-realtime-java-sdk/blob/master/src/SampleApp/OptionsSampleApp.java) and [Sample Websocket](https://github.com/intrinio/intrinio-realtime-java-sdk/blob/master/src/SampleApp/SampleApp.java)
 
 ## Options and Equities concurrently Example Usage
-* See [Equities Sample Websocket](https://github.com/intrinio/intrinio-realtime-java-sdk/blob/master/src/SampleApp/CompositeSampleApp.java) and [Sample Websocket](https://github.com/intrinio/intrinio-realtime-java-sdk/blob/master/src/SampleApp/SampleApp.java)
+* See [Composite Sample Websocket](https://github.com/intrinio/intrinio-realtime-java-sdk/blob/master/src/SampleApp/CompositeSampleApp.java) and [Sample Websocket](https://github.com/intrinio/intrinio-realtime-java-sdk/blob/master/src/SampleApp/SampleApp.java)
 
 ## Handling Events
 
@@ -260,6 +260,7 @@ After subscribing your starting list of symbols, you will call the `start` metho
 If you are using the non-firehose feed, you may update your subscriptions on the fly, using the `join` and `leave` methods.
 The WebSocket client is designed for near-indefinite operation. It will automatically reconnect if a connection drops/fails and when then servers turn on every morning.
 If you wish to perform a graceful shutdown of the application, please call the `stop` method.
+Realtime vs delayed is automatically handled by your account authorization.  If you wish to force delayed mode and have realtime access, you may use the delayed parameter in your configuration.
 
 ## Equities Methods
 

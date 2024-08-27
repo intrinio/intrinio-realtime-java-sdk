@@ -355,6 +355,7 @@ If a subscription has already been created with one of the `join` methods, data 
 	"apiKey": "",
 	"provider": "OPRA", //OPRA
 	"symbols": [ "GOOG__210917C01040000", "MSFT", "AAPL__210917C00130000", "SPY" ], //Individual contracts, or option chains to subscribe to all contracts under a symbol.
-	"numThreads": 4 //The number of threads to use for processing events.
+	"numThreads": 4, //The number of threads to use for processing events.
+    "delayed": false //If you have realtime access but want to force 15minute delayed, set this to true.
 }
 ```

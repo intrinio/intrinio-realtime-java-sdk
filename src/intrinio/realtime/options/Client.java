@@ -35,6 +35,7 @@ public class Client implements WebSocket.Listener {
 	private final Lock dataBucketLock = new ReentrantLock();
 	private final LinkedBlockingDeque<Tuple<byte[], Boolean>> dataBucket = new LinkedBlockingDeque<Tuple<byte[], Boolean>>();
 	private final WebSocketState wsState = new WebSocketState();
+	private final String Version = "IntrinioRealtimeOptionsJavaSDKv7.1";
 	//endregion Final data members
 
 	//region Data Members
@@ -526,7 +527,7 @@ public class Client implements WebSocket.Listener {
 		HttpURLConnection con;
 		try {
 			con = (HttpURLConnection) url.openConnection();
-			con.setRequestProperty("Client-Information", "IntrinioRealtimeOptionsJavaSDKv4.0");
+			con.setRequestProperty("Client-Information", Version);
 		} catch (IOException e) {
 			Client.Log("Authorization Failure. Please check your network connection. " + e.getMessage());
 			return false;

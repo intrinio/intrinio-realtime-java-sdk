@@ -19,7 +19,20 @@ public record Trade
 	 String conditions) {
 
 	public boolean isDarkpool(){
-		return marketCenter == 'D' || marketCenter == 'E'  || marketCenter == '\0' || marketCenter == Character.MIN_VALUE;
+		switch(this.subProvider) {
+			case CTA_A:
+			case CTA_B:
+			case OTC:
+			case UTP:
+				return marketCenter == 'D' || marketCenter == 'E'  || marketCenter == '\0' || marketCenter == Character.MIN_VALUE;
+				break;
+			case NASDAQ_BASIC:
+				return marketCenter == 'L' || marketCenter == '2'  || marketCenter == '\0' || marketCenter == Character.MIN_VALUE;
+				break;
+			default:
+				break;
+		}
+
 	}
 	
 	public String toString() {

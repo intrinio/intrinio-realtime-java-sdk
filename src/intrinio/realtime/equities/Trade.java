@@ -25,14 +25,11 @@ public record Trade
 			case OTC:
 			case UTP:
 				return marketCenter == 'D' || marketCenter == 'E'  || marketCenter == '\0' || marketCenter == Character.MIN_VALUE;
-				break;
 			case NASDAQ_BASIC:
 				return marketCenter == 'L' || marketCenter == '2'  || marketCenter == '\0' || marketCenter == Character.MIN_VALUE;
-				break;
 			default:
-				break;
+				return false;
 		}
-
 	}
 	
 	public String toString() {

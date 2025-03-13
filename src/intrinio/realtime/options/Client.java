@@ -354,7 +354,7 @@ public class Client implements WebSocket.Listener {
 	private void startThreads() throws Exception {
 		this.isCancellationRequested = false;
 		for (int i = 0; i < processDataThreads.length; i++) {
-			processDataThreads[i] = new Thread(()->processData());
+			processDataThreads[i] = new Thread(this::processData);
 		}
 		for (Thread thread : processDataThreads) {
 			thread.start();

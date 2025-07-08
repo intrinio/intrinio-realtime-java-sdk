@@ -1,6 +1,6 @@
 {
 	"equitiesApiKey": "",
-	"equitiesProvider": "REALTIME",
+	"equitiesProvider": "IEX",
 	"equitiesSymbols": [ "GOOG", "MSFT", "AAPL" ],
 	"equitiesTradesOnly": false,
 	"equitiesNumThreads": 2,

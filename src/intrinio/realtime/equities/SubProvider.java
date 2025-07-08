@@ -7,5 +7,6 @@ public enum SubProvider {
 	UTP,
 	OTC,
 	NASDAQ_BASIC,
-	IEX
+	IEX,
+	CBOE_ONE
 }

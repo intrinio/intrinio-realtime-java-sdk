@@ -67,6 +67,8 @@ public record Trade
 				break;
 			case 6: subProvider = SubProvider.IEX;
 				break;
+			case 7: subProvider = SubProvider.CBOE_ONE;
+				break;
 			default: subProvider = SubProvider.IEX;
 		}
 
@@ -118,6 +120,8 @@ public record Trade
 			case 5: source = SubProvider.NASDAQ_BASIC;
 				break;
 			case 6: source = SubProvider.IEX;
+				break;
+			case 7: source = SubProvider.CBOE_ONE;
 				break;
 			default: source = SubProvider.IEX;
 		}

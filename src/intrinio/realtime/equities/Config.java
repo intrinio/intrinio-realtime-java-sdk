@@ -15,14 +15,16 @@ public class Config {
 	private String equitiesIpAddress;
 	private String[] equitiesSymbols;
 	private boolean equitiesTradesOnly = true;
+	private boolean equitiesDelayed = false;
 	private int equitiesNumThreads = 4;
 	
-	public Config(String equitiesApiKey, Provider equitiesProvider, String equitiesIpAddress, String[] equitiesSymbols, boolean equitiesTradesOnly, int equitiesNumThreads) throws Exception {
+	public Config(String equitiesApiKey, Provider equitiesProvider, String equitiesIpAddress, String[] equitiesSymbols, boolean equitiesTradesOnly, int equitiesNumThreads, boolean equitiesDelayed) throws Exception {
 		this.equitiesApiKey = equitiesApiKey;
 		this.equitiesProvider = equitiesProvider;
 		this.equitiesIpAddress = equitiesIpAddress;
 		this.equitiesSymbols = equitiesSymbols;
 		this.equitiesTradesOnly = equitiesTradesOnly;
+		this.equitiesDelayed = equitiesDelayed;
 		this.equitiesNumThreads = equitiesNumThreads;
 		
 		if (this.equitiesApiKey.isBlank()) {
@@ -56,6 +58,10 @@ public class Config {
 		return equitiesTradesOnly;
 	}
 
+	public boolean isEquitiesDelayed() {
+		return equitiesDelayed;
+	}
+
 	public int getEquitiesNumThreads() {
 		return equitiesNumThreads;
 	}
@@ -67,6 +73,7 @@ public class Config {
 				this.equitiesIpAddress,
 				String.join(", ", this.equitiesSymbols),
 				this.equitiesTradesOnly,
+				this.equitiesDelayed,
 				this.equitiesNumThreads);
 	}
 

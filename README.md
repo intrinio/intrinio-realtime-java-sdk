@@ -1,5 +1,5 @@
 # Intrinio Java SDK for Real-Time Stock Prices
-SDK for working with Intrinio's realtime IEX, NASDAQ Basic, delayed SIP prices, and realtime/delayed [OPRA](https://www.opraplan.com/) options feeds.
+SDK for working with Intrinio's realtime IEX, NASDAQ Basic, CBOE One, delayed SIP prices, and realtime/delayed [OPRA](https://www.opraplan.com/) options feeds.
 
 [Intrinio](https://intrinio.com/) provides real-time and delayed stock prices via a two-way WebSocket connection. To get started, [subscribe to a real-time data feed](https://docs.intrinio.com/tutorial/websocket) and follow the instructions below.
 
@@ -86,6 +86,7 @@ public record Trade(String symbol, SubProvider subProvider, char marketCenter, d
   *    **`OTC`** - OTC in the DELAYED_SIP provider.
   *    **`NASDAQ_BASIC`** - NASDAQ Basic in the NASDAQ_BASIC provider.
   *    **`IEX`** - From the IEX exchange in the REALTIME provider.
+  *    **`CBOE_ONE`** - From the CBOE One exchanges provider.
 * **marketCenter** - Provides the market center
 * **price** - the price in USD
 * **size** - the size of the last trade.
@@ -111,12 +112,109 @@ public record Quote(QuoteType type, String symbol, SubProvider subProvider, char
   *    **`OTC`** - OTC in the DELAYED_SIP provider.
   *    **`NASDAQ_BASIC`** - NASDAQ Basic in the NASDAQ_BASIC provider.
   *    **`IEX`** - From the IEX exchange in the REALTIME provider.
+  *    **`CBOE_ONE`** - From the CBOE One exchanges provider.
 * **marketCenter** - Provides the market center
 * **symbol** - Ticker symbol.
 * **price** - the price in USD
 * **size** - the size of the last ask or bid).
 * **timestamp** - a Unix timestamp in nanoseconds since unix epoch.
 * **conditions** - Provides the conditions
+
+### Equities Trade Conditions
+
+| Value | Description                                       |
+|-------|---------------------------------------------------|
+| @     | Regular Sale                                      |
+| A     | Acquisition                                       |
+| B     | Bunched Trade                                     |
+| C     | Cash Sale                                         |
+| D     | Distribution                                      |
+| E     | Placeholder                                       |
+| F     | Intermarket Sweep                                 |
+| G     | Bunched Sold Trade                                |
+| H     | Priced Variation Trade                            |
+| I     | Odd Lot Trade                                     |
+| K     | Rule 155 Trade (AMEX)                             |
+| L     | Sold Last                                         |
+| M     | Market Center Official Close                      |
+| N     | Next Day                                          |
+| O     | Opening Prints                                    |
+| P     | Prior Reference Price                             |
+| Q     | Market Center Official Open                       |
+| R     | Seller                                            |
+| S     | Split Trade                                       |
+| T     | Form T                                            |
+| U     | Extended Trading Hours (Sold Out of Sequence)     |
+| V     | Contingent Trade                                  |
+| W     | Average Price Trade                               |
+| X     | Cross/Periodic Auction Trade                      |
+| Y     | Yellow Flag Regular Trade                         |
+| Z     | Sold (Out of Sequence)                            |
+| 1     | Stopped Stock (Regular Trade)                     |
+| 4     | Derivatively Priced                               |
+| 5     | Re-Opening Prints                                 |
+| 6     | Closing Prints                                    |
+| 7     | Qualified Contingent Trade (QCT)                  |
+| 8     | Placeholder for 611 Exempt                        |
+| 9     | Corrected Consolidated Close (Per Listing Market) |
+
+
+### Equities Trade Conditions (CBOE One)
+Trade conditions for CBOE One are represented as the integer representation of a bit flag.
+
+None                      = 0,
+UpdateHighLowConsolidated = 1,
+UpdateLastConsolidated    = 2,
+UpdateHighLowMarketCenter = 4,
+UpdateLastMarketCenter    = 8,
+UpdateVolumeConsolidated  = 16,
+OpenConsolidated          = 32,
+OpenMarketCenter          = 64,
+CloseConsolidated         = 128,
+CloseMarketCenter         = 256,
+UpdateVolumeMarketCenter  = 512
+
+
+### Equities Quote Conditions
+
+| Value | Description                                 |
+|-------|---------------------------------------------|
+| R     | Regular                                     |
+| A     | Slow on Ask                                 |
+| B     | Slow on Bid                                 |
+| C     | Closing                                     |
+| D     | News Dissemination                          |
+| E     | Slow on Bid (LRP or Gap Quote)              |
+| F     | Fast Trading                                |
+| G     | Trading Range Indication                    |
+| H     | Slow on Bid and Ask                         |
+| I     | Order Imbalance                             |
+| J     | Due to Related - News Dissemination         |
+| K     | Due to Related - News Pending               |
+| O     | Open                                        |
+| L     | Closed                                      |
+| M     | Volatility Trading Pause                    |
+| N     | Non-Firm Quote                              |
+| O     | Opening                                     |
+| P     | News Pending                                |
+| S     | Due to Related                              |
+| T     | Resume                                      |
+| U     | Slow on Bid and Ask (LRP or Gap Quote)      |
+| V     | In View of Common                           |
+| W     | Slow on Bid and Ask (Non-Firm)              |
+| X     | Equipment Changeover                        |
+| Y     | Sub-Penny Trading                           |
+| Z     | No Open / No Resume                         |
+| 1     | Market Wide Circuit Breaker Level 1         |
+| 2     | Market Wide Circuit Breaker Level 2         |        
+| 3     | Market Wide Circuit Breaker Level 3         |
+| 4     | On Demand Intraday Auction                  |        
+| 45    | Additional Information Required (CTS)       |      
+| 46    | Regulatory Concern (CTS)                    |     
+| 47    | Merger Effective                            |    
+| 49    | Corporate Action (CTS)                      |   
+| 50    | New Security Offering (CTS)                 |  
+| 51    | Intraday Indicative Value Unavailable (CTS) |
 
 ### Options Trade Message
 
@@ -289,7 +387,7 @@ client.leave()
 ```json
 {
 	"apiKey": "",
-	"provider": "REALTIME", //or DELAYED_SIP or NASDAQ_BASIC or MANUAL
+	"provider": "IEX", //or DELAYED_SIP or NASDAQ_BASIC or CBOE_ONE or MANUAL
 	"symbols": [ "AAPL", "MSFT", "GOOG" ], //This is a list of individual tickers to subscribe to, or "lobby" to subscribe to all at once (firehose).
 	"tradesOnly": true, //This indicates whether you only want trade events (true) or you want trade, ask, and bid events (false).
 	"numThreads": 4 //The number of threads to use for processing events.

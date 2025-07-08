@@ -119,9 +119,13 @@ public class Client implements WebSocket.Listener {
 		switch (config.getEquitiesProvider()) {
 			case REALTIME: authUrl = "https://realtime-mx.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
 				break;
+			case IEX: authUrl = "https://realtime-mx.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
+				break;
 			case DELAYED_SIP: authUrl = "https://realtime-delayed-sip.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
 				break;
 			case NASDAQ_BASIC: authUrl = "https://realtime-nasdaq-basic.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
+				break;
+			case CBOE_ONE: authUrl = "https://cboe-one.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
 				break;
 			case MANUAL: authUrl = "http://" + config.getEquitiesIpAddress() + "/auth?api_key=" + config.getEquitiesApiKey();
 				break;
@@ -132,14 +136,19 @@ public class Client implements WebSocket.Listener {
 
 	private String getWebSocketUrl (String token) throws Exception {
 		String wsUrl;
+		String delayedPart = config.isEquitiesDelayed() ? "&delayed=true" : "";
 		switch (config.getEquitiesProvider()) {
-			case REALTIME: wsUrl = "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
+			case REALTIME: wsUrl = "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
 				break;
-			case DELAYED_SIP: wsUrl = "wss://realtime-delayed-sip.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
+			case IEX: wsUrl = "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
 				break;
-			case NASDAQ_BASIC: wsUrl = "wss://realtime-nasdaq-basic.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token;
+			case DELAYED_SIP: wsUrl = "wss://realtime-delayed-sip.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
 				break;
-			case MANUAL: wsUrl = "ws://" + config.getEquitiesIpAddress() + "/socket/websocket?vsn=1.0.0&token=" + token;
+			case NASDAQ_BASIC: wsUrl = "wss://realtime-nasdaq-basic.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
+				break;
+			case CBOE_ONE: wsUrl = "wss://cboe-one.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
+				break;
+			case MANUAL: wsUrl = "ws://" + config.getEquitiesIpAddress() + "/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
 				break;
 			default: throw new Exception("Provider not specified!");
 		}

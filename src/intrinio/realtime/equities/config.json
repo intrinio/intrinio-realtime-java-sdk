@@ -3,5 +3,6 @@
 	"equitiesProvider": "REALTIME",
 	"equitiesSymbols": [ "GOOG", "MSFT", "AAPL" ],
 	"equitiesTradesOnly": false,
-	"equitiesNumThreads": 2
+	"equitiesNumThreads": 2,
+	"equitiesDelayed": false
 }

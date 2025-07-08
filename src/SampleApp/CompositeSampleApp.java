@@ -21,7 +21,7 @@ public class CompositeSampleApp {
 
         intrinio.realtime.equities.Config equitiesConfig = null;
         try{
-            equitiesConfig = new intrinio.realtime.equities.Config(apiKey, intrinio.realtime.equities.Provider.NASDAQ_BASIC, null, new String[]{"MSFT", "NVDA", "AAPL"}, true, 4);
+            equitiesConfig = new intrinio.realtime.equities.Config(apiKey, intrinio.realtime.equities.Provider.NASDAQ_BASIC, null, new String[]{"MSFT", "NVDA", "AAPL"}, true, 4, false);
         }catch (Exception e){
             System.out.println("Error parsing equities config: " + e.getMessage());
             return;

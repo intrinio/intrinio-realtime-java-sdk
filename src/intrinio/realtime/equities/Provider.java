@@ -5,5 +5,7 @@ public enum Provider {
 	REALTIME,
 	MANUAL,
 	DELAYED_SIP,
-	NASDAQ_BASIC
+	NASDAQ_BASIC,
+	CBOE_ONE,
+	IEX
 }

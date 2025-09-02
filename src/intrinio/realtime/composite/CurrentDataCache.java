@@ -1,256 +1,304 @@
 package intrinio.realtime.composite;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * This is a simple thread-safe non-transactional cache intended to store the most recent data for an event type.
- * The on-updated events do not clone data before returning, so will always represent the newest data, even if it's
- * changed before you process it.
- */
-public class CurrentDataCache implements DataCache
-{
-    //region Data Members
-    private final ConcurrentHashMap<String, CurrentSecurityData> data;
-    private final Map<String, SecurityData> readonlyData;
-    private OnSupplementalDatumUpdated onSupplementalDatumUpdated;
-    private OnSecuritySupplementalDatumUpdated onSecuritySupplementalDatumUpdated;
-    private OnOptionsContractSupplementalDatumUpdated onOptionsContractSupplementalDatumUpdated;
-    private OnEquitiesQuoteUpdated onEquitiesQuoteUpdated;
-    private OnEquitiesTradeUpdated onEquitiesTradeUpdated;
-    private OnOptionsQuoteUpdated onOptionsQuoteUpdated;
-    private OnOptionsTradeUpdated onOptionsTradeUpdated;
-    private OnOptionsRefreshUpdated onOptionsRefreshUpdated;
-    private final ConcurrentHashMap<String, Double> supplementaryData;
-    private final Map<String, Double> readonlySupplementaryData;
-    //endregion Data Members
+class CurrentDataCache implements DataCache {
+    private final ConcurrentHashMap<String, SecurityData> securities = new ConcurrentHashMap<>();
+    private final Map<String, SecurityData> readonlySecurities = Collections.unmodifiableMap(securities);
+    private final ConcurrentHashMap<String, Double> supplementaryData = new ConcurrentHashMap<>();
+    private final Map<String, Double> readonlySupplementaryData = Collections.unmodifiableMap(supplementaryData);
 
-    //region Constructors
-    public CurrentDataCache(){
-        this.data = new ConcurrentHashMap<String, CurrentSecurityData>();
-        this.readonlyData = java.util.Collections.unmodifiableMap(this.data);
-        this.onSupplementalDatumUpdated = null;
-        this.onSecuritySupplementalDatumUpdated = null;
-        this.onOptionsContractSupplementalDatumUpdated = null;
-        this.onEquitiesQuoteUpdated = null;
-        this.onEquitiesTradeUpdated = null;
-        this.onOptionsQuoteUpdated = null;
-        this.onOptionsTradeUpdated = null;
-        this.onOptionsRefreshUpdated = null;
-        this.supplementaryData = new ConcurrentHashMap<String, Double>();
-        this.readonlySupplementaryData = java.util.Collections.unmodifiableMap(supplementaryData);
+    private OnSupplementalDatumUpdated supplementalDatumUpdatedCallback;
+    private OnSecuritySupplementalDatumUpdated securitySupplementalDatumUpdatedCallback;
+    private OnOptionsContractSupplementalDatumUpdated optionsContractSupplementalDatumUpdatedCallback;
+
+    private OnOptionsContractGreekDataUpdated optionsContractGreekDataUpdatedCallback;
+
+    private OnEquitiesTradeUpdated equitiesTradeUpdatedCallback;
+    private OnEquitiesQuoteUpdated equitiesQuoteUpdatedCallback;
+
+    private OnOptionsTradeUpdated optionsTradeUpdatedCallback;
+    private OnOptionsQuoteUpdated optionsQuoteUpdatedCallback;
+    private OnOptionsRefreshUpdated optionsRefreshUpdatedCallback;
+    private OnOptionsUnusualActivityUpdated optionsUnusualActivityUpdatedCallback;
+
+    public CurrentDataCache() {
     }
-    //endregion Constructors
 
-    //region Public Methods
-    public Double getsupplementaryDatum(String key){
+    public Double getSupplementaryDatum(String key) {
         return supplementaryData.getOrDefault(key, null);
     }
 
-    public boolean setsupplementaryDatum(String key, double datum){
-        boolean isSet = datum == supplementaryData.compute(key, (k, oldValue) -> datum);
-        if (this.onSupplementalDatumUpdated != null){
-            try{
-                this.onSupplementalDatumUpdated.onSupplementalDatumUpdated(key, datum, this);
-            }catch (Exception e){
-                Log("Error in setsupplementaryDatum Callback: " + e.getMessage());
+    public boolean setSupplementaryDatum(String key, Double datum, SupplementalDatumUpdate update) {
+        Double newValue = supplementaryData.compute(key, (k, oldValue) -> update.supplementalDatumUpdate(k, oldValue, datum));
+        boolean result = java.util.Objects.equals(datum, newValue);
+        if (result && supplementalDatumUpdatedCallback != null) {
+            try {
+                supplementalDatumUpdatedCallback.onSupplementalDatumUpdated(key, datum, this);
+            } catch (Exception e) {
+                Log("Error in OnSupplementalDatumUpdated Callback: " + e.getMessage());
             }
         }
-        return isSet;
+        return result;
     }
 
-    public Map<String, Double> getAllSupplementaryData(){return readonlySupplementaryData;}
-
-    public SecurityData getSecurityData(String tickerSymbol){
-        return data.getOrDefault(tickerSymbol, null);
+    public Map<String, Double> getAllSupplementaryData() {
+        return readonlySupplementaryData;
     }
 
-    public Map<String, SecurityData> getAllSecurityData(){
-        return readonlyData;
+    public Double getSecuritySupplementalDatum(String tickerSymbol, String key) {
+        SecurityData securityData = securities.get(tickerSymbol);
+        return securityData != null ? securityData.getSupplementaryDatum(key) : null;
     }
 
-    public intrinio.realtime.equities.Trade getEquityTrade(String tickerSymbol){
-        if (data.containsKey(tickerSymbol))
-            return data.get(tickerSymbol).getEquitiesTrade();
-        else return null;
-    }
-
-    public boolean setEquityTrade(intrinio.realtime.equities.Trade trade){
-        String symbol = trade.symbol();
-        CurrentSecurityData securityData;
-        if (data.containsKey(symbol)){
-            securityData = data.get(symbol);
+    public boolean setSecuritySupplementalDatum(String tickerSymbol, String key, Double datum, SupplementalDatumUpdate update) {
+        if (tickerSymbol != null && !tickerSymbol.trim().isEmpty()) {
+            SecurityData securityData = securities.computeIfAbsent(tickerSymbol, k -> new CurrentSecurityData(tickerSymbol, null, null, null));
+            return securityData.setSupplementaryDatum(key, datum, securitySupplementalDatumUpdatedCallback, this, update);
         }
-        else {
-            CurrentSecurityData newData = new CurrentSecurityData(symbol);
-            CurrentSecurityData possiblyNewerData = data.putIfAbsent(symbol, newData);
-            securityData = Objects.requireNonNullElse(possiblyNewerData, newData);
+        return false;
+    }
+
+    public Double getOptionsContractSupplementalDatum(String tickerSymbol, String contract, String key) {
+        SecurityData securityData = securities.get(tickerSymbol);
+        return securityData != null ? securityData.getOptionsContractSupplementalDatum(contract, key) : null;
+    }
+
+    public boolean setOptionSupplementalDatum(String tickerSymbol, String contract, String key, Double datum, SupplementalDatumUpdate update) {
+        if (tickerSymbol != null && !tickerSymbol.trim().isEmpty()) {
+            SecurityData securityData = securities.computeIfAbsent(tickerSymbol, k -> new CurrentSecurityData(tickerSymbol, null, null, null));
+            return securityData.setOptionsContractSupplementalDatum(contract, key, datum, optionsContractSupplementalDatumUpdatedCallback, this, update);
         }
-        return securityData.setEquitiesTrade(trade, this.onEquitiesTradeUpdated, this);
+        return false;
     }
 
-    public intrinio.realtime.equities.Quote getEquityQuote(String tickerSymbol){
-        if (data.containsKey(tickerSymbol))
-            return data.get(tickerSymbol).getEquitiesQuote();
-        else return null;
+    public Greek getOptionsContractGreekData(String tickerSymbol, String contract, String key) {
+        SecurityData securityData = securities.get(tickerSymbol);
+        return securityData != null ? securityData.getOptionsContractGreekData(contract, key) : null;
     }
 
-    public boolean setEquityQuote(intrinio.realtime.equities.Quote quote){
-        String symbol = quote.symbol();
-        CurrentSecurityData securityData;
-        if (data.containsKey(symbol)){
-            securityData = data.get(symbol);
+    public boolean setOptionGreekData(String tickerSymbol, String contract, String key, Greek data, GreekDataUpdate update) {
+        if (tickerSymbol != null && !tickerSymbol.trim().isEmpty()) {
+            SecurityData securityData = securities.computeIfAbsent(tickerSymbol, k -> new CurrentSecurityData(tickerSymbol, null, null, null));
+            return securityData.setOptionsContractGreekData(contract, key, data, optionsContractGreekDataUpdatedCallback, this, update);
         }
-        else {
-            CurrentSecurityData newData = new CurrentSecurityData(symbol);
-            CurrentSecurityData possiblyNewerData = data.putIfAbsent(symbol, newData);
-            securityData = Objects.requireNonNullElse(possiblyNewerData, newData);
+        return false;
+    }
+
+    public SecurityData getSecurityData(String tickerSymbol) {
+        return securities.get(tickerSymbol);
+    }
+
+    public Map<String, SecurityData> getAllSecurityData() {
+        return readonlySecurities;
+    }
+
+    public OptionsContractData getOptionsContractData(String tickerSymbol, String contract) {
+        SecurityData securityData = securities.get(tickerSymbol);
+        return securityData != null ? securityData.getOptionsContractData(contract) : null;
+    }
+
+    public Map<String, OptionsContractData> getAllOptionsContractData(String tickerSymbol) {
+        SecurityData securityData = securities.get(tickerSymbol);
+        return securityData != null ? securityData.getAllOptionsContractData() : Collections.emptyMap();
+    }
+
+    public intrinio.realtime.equities.Trade getLatestEquityTrade(String tickerSymbol) {
+        SecurityData securityData = securities.get(tickerSymbol);
+        return securityData != null ? securityData.getLatestEquitiesTrade() : null;
+    }
+
+    public boolean setEquityTrade(intrinio.realtime.equities.Trade trade) {
+        if (trade != null) {
+            String symbol = trade.symbol();
+            SecurityData securityData = securities.computeIfAbsent(symbol, k -> new CurrentSecurityData(symbol, trade, null, null));
+            return securityData.setEquitiesTrade(trade, equitiesTradeUpdatedCallback, this);
         }
-        return securityData.setEquitiesQuote(quote, this.onEquitiesQuoteUpdated, this);
+        return false;
     }
 
-    public OptionsContractData getOptionsContractData(String tickerSymbol, String contract){
-        if (data.containsKey(tickerSymbol))
-            return data.get(tickerSymbol).getOptionsContractData(contract);
-        else return null;
+    public void onTrade(intrinio.realtime.equities.Trade trade) {
+        setEquityTrade(trade);
     }
 
-    public intrinio.realtime.options.Trade getOptionsTrade(String tickerSymbol, String contract){
-        if (data.containsKey(tickerSymbol))
-            return data.get(tickerSymbol).getOptionsContractTrade(contract);
-        else return null;
+    public intrinio.realtime.equities.Quote getLatestEquityAskQuote(String tickerSymbol) {
+        SecurityData securityData = securities.get(tickerSymbol);
+        return securityData != null ? securityData.getLatestEquitiesAskQuote() : null;
     }
 
-    public boolean setOptionsTrade(intrinio.realtime.options.Trade trade){
-        String underlyingSymbol = trade.getUnderlyingSymbol();
-        CurrentSecurityData securityData;
-        if (data.containsKey(underlyingSymbol)){
-            securityData = data.get(underlyingSymbol);
+    public intrinio.realtime.equities.Quote getLatestEquityBidQuote(String tickerSymbol) {
+        SecurityData securityData = securities.get(tickerSymbol);
+        return securityData != null ? securityData.getLatestEquitiesBidQuote() : null;
+    }
+
+    public boolean setEquityQuote(intrinio.realtime.equities.Quote quote) {
+        if (quote != null) {
+            String symbol = quote.symbol();
+            SecurityData securityData = securities.computeIfAbsent(symbol, k -> new CurrentSecurityData(symbol, null, quote.type() == intrinio.realtime.equities.QuoteType.ASK ? quote : null, quote.type() == intrinio.realtime.equities.QuoteType.BID ? quote : null));
+            return securityData.setEquitiesQuote(quote, equitiesQuoteUpdatedCallback, this);
         }
-        else {
-            CurrentSecurityData newData = new CurrentSecurityData(underlyingSymbol);
-            CurrentSecurityData possiblyNewerData = data.putIfAbsent(underlyingSymbol, newData);
-            securityData = Objects.requireNonNullElse(possiblyNewerData, newData);
+        return false;
+    }
+
+    public void onQuote(intrinio.realtime.equities.Quote quote) {
+        setEquityQuote(quote);
+    }
+
+    public intrinio.realtime.options.Trade getLatestOptionsTrade(String tickerSymbol, String contract) {
+        SecurityData securityData = securities.get(tickerSymbol);
+        return securityData != null ? securityData.getOptionsContractTrade(contract) : null;
+    }
+
+    public boolean setOptionsTrade(intrinio.realtime.options.Trade trade) {
+        if (trade != null) {
+            String underlyingSymbol = trade.getUnderlyingSymbol();
+            SecurityData securityData = securities.computeIfAbsent(underlyingSymbol, k -> new CurrentSecurityData(underlyingSymbol, null, null, null));
+            return securityData.setOptionsContractTrade(trade, optionsTradeUpdatedCallback, this);
         }
-        return securityData.setOptionsTrade(trade, this.onOptionsTradeUpdated, this);
+        return false;
     }
 
-    public intrinio.realtime.options.Quote getOptionsQuote(String tickerSymbol, String contract){
-        if (data.containsKey(tickerSymbol))
-            return data.get(tickerSymbol).getOptionsContractQuote(contract);
-        else return null;
+    public void onTrade(intrinio.realtime.options.Trade trade) {
+        setOptionsTrade(trade);
     }
 
-    public boolean setOptionsQuote(intrinio.realtime.options.Quote quote){
-        String underlyingSymbol = quote.getUnderlyingSymbol();
-        CurrentSecurityData securityData;
-        if (data.containsKey(underlyingSymbol)){
-            securityData = data.get(underlyingSymbol);
+    public intrinio.realtime.options.Quote getLatestOptionsQuote(String tickerSymbol, String contract) {
+        SecurityData securityData = securities.get(tickerSymbol);
+        return securityData != null ? securityData.getOptionsContractQuote(contract) : null;
+    }
+
+    public boolean setOptionsQuote(intrinio.realtime.options.Quote quote) {
+        if (quote != null) {
+            String underlyingSymbol = quote.getUnderlyingSymbol();
+            SecurityData securityData = securities.computeIfAbsent(underlyingSymbol, k -> new CurrentSecurityData(underlyingSymbol, null, null, null));
+            return securityData.setOptionsContractQuote(quote, optionsQuoteUpdatedCallback, this);
         }
-        else {
-            CurrentSecurityData newData = new CurrentSecurityData(underlyingSymbol);
-            CurrentSecurityData possiblyNewerData = data.putIfAbsent(underlyingSymbol, newData);
-            securityData = Objects.requireNonNullElse(possiblyNewerData, newData);
+        return false;
+    }
+
+    public void onQuote(intrinio.realtime.options.Quote quote) {
+        setOptionsQuote(quote);
+    }
+
+    public intrinio.realtime.options.Refresh getLatestOptionsRefresh(String tickerSymbol, String contract) {
+        SecurityData securityData = securities.get(tickerSymbol);
+        return securityData != null ? securityData.getOptionsContractRefresh(contract) : null;
+    }
+
+    public boolean setOptionsRefresh(intrinio.realtime.options.Refresh refresh) {
+        if (refresh != null) {
+            String underlyingSymbol = refresh.getUnderlyingSymbol();
+            SecurityData securityData = securities.computeIfAbsent(underlyingSymbol, k -> new CurrentSecurityData(underlyingSymbol, null, null, null));
+            return securityData.setOptionsContractRefresh(refresh, optionsRefreshUpdatedCallback, this);
         }
-        return securityData.setOptionsQuote(quote, this.onOptionsQuoteUpdated, this);
+        return false;
     }
 
-    public intrinio.realtime.options.Refresh getOptionsRefresh(String tickerSymbol, String contract){
-        if (data.containsKey(tickerSymbol))
-            return data.get(tickerSymbol).getOptionsContractRefresh(contract);
-        else return null;
+    public void onRefresh(intrinio.realtime.options.Refresh refresh) {
+        setOptionsRefresh(refresh);
     }
 
-    public boolean setOptionsRefresh(intrinio.realtime.options.Refresh refresh){
-        String underlyingSymbol = refresh.getUnderlyingSymbol();
-        CurrentSecurityData securityData;
-        if (data.containsKey(underlyingSymbol)){
-            securityData = data.get(underlyingSymbol);
+    public intrinio.realtime.options.UnusualActivity getLatestOptionsUnusualActivity(String tickerSymbol, String contract) {
+        SecurityData securityData = securities.get(tickerSymbol);
+        return securityData != null ? securityData.getOptionsContractUnusualActivity(contract) : null;
+    }
+
+    public boolean setOptionsUnusualActivity(intrinio.realtime.options.UnusualActivity unusualActivity) {
+        if (unusualActivity != null) {
+            String underlyingSymbol = unusualActivity.getUnderlyingSymbol();
+            SecurityData securityData = securities.computeIfAbsent(underlyingSymbol, k -> new CurrentSecurityData(underlyingSymbol, null, null, null));
+            return securityData.setOptionsContractUnusualActivity(unusualActivity, optionsUnusualActivityUpdatedCallback, this);
         }
-        else {
-            CurrentSecurityData newData = new CurrentSecurityData(underlyingSymbol);
-            CurrentSecurityData possiblyNewerData = data.putIfAbsent(underlyingSymbol, newData);
-            securityData = Objects.requireNonNullElse(possiblyNewerData, newData);
-        }
-        return securityData.setOptionsRefresh(refresh, this.onOptionsRefreshUpdated, this);
+        return false;
     }
 
-    public Double getSecuritySupplementalDatum(String tickerSymbol, String key){
-        if (data.containsKey(tickerSymbol))
-            return data.get(tickerSymbol).getSupplementaryDatum(key);
-        else return null;
+    public void onUnusualActivity(intrinio.realtime.options.UnusualActivity unusualActivity) {
+        setOptionsUnusualActivity(unusualActivity);
     }
 
-    public boolean setSecuritySupplementalDatum(String tickerSymbol, String key, double datum){
-        boolean result = false;
-        CurrentSecurityData currentSecurityData;
-        if (data.containsKey(tickerSymbol)) {
-            currentSecurityData = data.get(tickerSymbol);
-        }
-        else {
-            CurrentSecurityData newData = new CurrentSecurityData(tickerSymbol);
-            CurrentSecurityData possiblyNewerData = data.putIfAbsent(tickerSymbol, newData);
-            currentSecurityData = possiblyNewerData == null ? newData : possiblyNewerData;
-        }
-        return currentSecurityData.setSupplementaryDatum(key, datum, this.onSecuritySupplementalDatumUpdated, this);
+    public OnSupplementalDatumUpdated getSupplementalDatumUpdatedCallback() {
+        return supplementalDatumUpdatedCallback;
     }
 
-    public Double getOptionsContractSupplementalDatum(String tickerSymbol, String contract, String key){
-        if (data.containsKey(tickerSymbol))
-            return data.get(tickerSymbol).getOptionsContractSupplementalDatum(contract, key);
-        else return null;
+    public void setSupplementalDatumUpdatedCallback(OnSupplementalDatumUpdated supplementalDatumUpdatedCallback) {
+        this.supplementalDatumUpdatedCallback = supplementalDatumUpdatedCallback;
     }
 
-    public boolean setOptionSupplementalDatum(String tickerSymbol, String contract, String key, double datum){
-        CurrentSecurityData currentSecurityData;
-        if (data.containsKey(tickerSymbol)) {
-            currentSecurityData = data.get(tickerSymbol);
-        }
-        else {
-            CurrentSecurityData newData = new CurrentSecurityData(tickerSymbol);
-            CurrentSecurityData possiblyNewerData = data.putIfAbsent(tickerSymbol, newData);
-            currentSecurityData = possiblyNewerData == null ? newData : possiblyNewerData;
-        }
-        return currentSecurityData.setOptionsContractSupplementalDatum(contract, key, datum, onOptionsContractSupplementalDatumUpdated, this);
+    public OnSecuritySupplementalDatumUpdated getSecuritySupplementalDatumUpdatedCallback() {
+        return securitySupplementalDatumUpdatedCallback;
     }
 
-    public void setOnSupplementalDatumUpdated(OnSupplementalDatumUpdated onSupplementalDatumUpdated){
-        this.onSupplementalDatumUpdated = onSupplementalDatumUpdated;
+    public void setSecuritySupplementalDatumUpdatedCallback(OnSecuritySupplementalDatumUpdated securitySupplementalDatumUpdatedCallback) {
+        this.securitySupplementalDatumUpdatedCallback = securitySupplementalDatumUpdatedCallback;
     }
 
-    public void setOnSecuritySupplementalDatumUpdated(OnSecuritySupplementalDatumUpdated onSecuritySupplementalDatumUpdated){
-        this.onSecuritySupplementalDatumUpdated = onSecuritySupplementalDatumUpdated;
+    public OnOptionsContractSupplementalDatumUpdated getOptionsContractSupplementalDatumUpdatedCallback() {
+        return optionsContractSupplementalDatumUpdatedCallback;
     }
 
-    public void setOnOptionSupplementalDatumUpdated(OnOptionsContractSupplementalDatumUpdated onOptionsContractSupplementalDatumUpdated){
-        this.onOptionsContractSupplementalDatumUpdated = onOptionsContractSupplementalDatumUpdated;
+    public void setOptionsContractSupplementalDatumUpdatedCallback(OnOptionsContractSupplementalDatumUpdated optionsContractSupplementalDatumUpdatedCallback) {
+        this.optionsContractSupplementalDatumUpdatedCallback = optionsContractSupplementalDatumUpdatedCallback;
     }
 
-    public void setOnEquitiesQuoteUpdated(OnEquitiesQuoteUpdated onEquitiesQuoteUpdated){
-        this.onEquitiesQuoteUpdated = onEquitiesQuoteUpdated;
+    public OnOptionsContractGreekDataUpdated getOptionsContractGreekDataUpdatedCallback() {
+        return optionsContractGreekDataUpdatedCallback;
     }
 
-    public void setOnEquitiesTradeUpdated(OnEquitiesTradeUpdated onEquitiesTradeUpdated){
-        this.onEquitiesTradeUpdated = onEquitiesTradeUpdated;
+    public void setOptionsContractGreekDataUpdatedCallback(OnOptionsContractGreekDataUpdated optionsContractGreekDataUpdatedCallback) {
+        this.optionsContractGreekDataUpdatedCallback = optionsContractGreekDataUpdatedCallback;
     }
 
-    public void setOnOptionsQuoteUpdated(OnOptionsQuoteUpdated onOptionsQuoteUpdated){
-        this.onOptionsQuoteUpdated = onOptionsQuoteUpdated;
+    public OnEquitiesTradeUpdated getEquitiesTradeUpdatedCallback() {
+        return equitiesTradeUpdatedCallback;
     }
 
-    public void setOnOptionsTradeUpdated(OnOptionsTradeUpdated onOptionsTradeUpdated){
-        this.onOptionsTradeUpdated = onOptionsTradeUpdated;
+    public void setEquitiesTradeUpdatedCallback(OnEquitiesTradeUpdated equitiesTradeUpdatedCallback) {
+        this.equitiesTradeUpdatedCallback = equitiesTradeUpdatedCallback;
     }
 
-    public void setOnOptionsRefreshUpdated(OnOptionsRefreshUpdated onOptionsRefreshUpdated){
-        this.onOptionsRefreshUpdated = onOptionsRefreshUpdated;
+    public OnEquitiesQuoteUpdated getEquitiesQuoteUpdatedCallback() {
+        return equitiesQuoteUpdatedCallback;
     }
-    //endregion Public Methods
 
-    //region Private Methods
+    public void setEquitiesQuoteUpdatedCallback(OnEquitiesQuoteUpdated equitiesQuoteUpdatedCallback) {
+        this.equitiesQuoteUpdatedCallback = equitiesQuoteUpdatedCallback;
+    }
+
+    public OnOptionsTradeUpdated getOptionsTradeUpdatedCallback() {
+        return optionsTradeUpdatedCallback;
+    }
+
+    public void setOptionsTradeUpdatedCallback(OnOptionsTradeUpdated optionsTradeUpdatedCallback) {
+        this.optionsTradeUpdatedCallback = optionsTradeUpdatedCallback;
+    }
+
+    public OnOptionsQuoteUpdated getOptionsQuoteUpdatedCallback() {
+        return optionsQuoteUpdatedCallback;
+    }
+
+    public void setOptionsQuoteUpdatedCallback(OnOptionsQuoteUpdated optionsQuoteUpdatedCallback) {
+        this.optionsQuoteUpdatedCallback = optionsQuoteUpdatedCallback;
+    }
+
+    public OnOptionsRefreshUpdated getOptionsRefreshUpdatedCallback() {
+        return optionsRefreshUpdatedCallback;
+    }
+
+    public void setOptionsRefreshUpdatedCallback(OnOptionsRefreshUpdated optionsRefreshUpdatedCallback) {
+        this.optionsRefreshUpdatedCallback = optionsRefreshUpdatedCallback;
+    }
+
+    public OnOptionsUnusualActivityUpdated getOptionsUnusualActivityUpdatedCallback() {
+        return optionsUnusualActivityUpdatedCallback;
+    }
+
+    public void setOptionsUnusualActivityUpdatedCallback(OnOptionsUnusualActivityUpdated optionsUnusualActivityUpdatedCallback) {
+        this.optionsUnusualActivityUpdatedCallback = optionsUnusualActivityUpdatedCallback;
+    }
+    
     private void Log(String message){
         System.out.println(message);
     }
-
-    //endregion Private Methods
 }

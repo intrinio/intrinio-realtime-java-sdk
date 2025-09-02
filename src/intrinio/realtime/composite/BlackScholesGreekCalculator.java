@@ -1,193 +1,141 @@
-//package intrinio.realtime.composite;
-//
-//public class BlackScholesGreekCalculator implements GreekCalculator
-//{
-//    private final double LOW_VOL = 0.0;
-//    private final double HIGH_VOL = 5.0;
-//    private final double VOL_TOLERANCE = 0.0001;
-//    private final double MIN_Z_SCORE = -8.0;
-//    private final double MAX_Z_SCORE = 8.0;
-//    private final String DividendYieldKey = "DividendYield";
-//
-//    @Override
-//    public Greek calculate(String contract, SecurityData calcData, Double riskFreeInterestRate) {
-//        intrinio.realtime.equities.Trade underlyingTrade = calcData.getEquitiesTrade();
-//        OptionsContractData optionsContractData = calcData.getOptionsContractData(contract);
-//        if (optionsContractData == null){
-//            return null;
-//        }
-//        intrinio.realtime.options.Trade latestOptionTrade = optionsContractData.getTrade();
-//        intrinio.realtime.options.Quote latestOptionQuote = optionsContractData.getQuote();
-//        if (underlyingTrade == null || latestOptionTrade == null || latestOptionQuote == null)
-//            return null;
-//        if (latestOptionQuote.askPrice() <= 0.0 || latestOptionQuote.bidPrice() <= 0.0)
-//            return null;
-//        if (riskFreeInterestRate == null || riskFreeInterestRate <= 0.0)
-//            return null;
-//
-//        boolean isPut = latestOptionTrade.isPut();
-//        double underlyingPrice = underlyingTrade.price();
-//        double strike = latestOptionTrade.getStrikePrice();
-//        double daysToExpiration = getDaysToExpiration(latestOptionTrade, latestOptionQuote);
-//        double dividendYield = calcData.getSupplementaryDatum(DividendYieldKey);
-//        double marketPrice = (latestOptionQuote.askPrice() + latestOptionQuote.bidPrice()) / 2.0;
-//        double impliedVolatility = calcImpliedVolatility(isPut, underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice);
-//        double sigma = impliedVolatility;
-//        double delta = calcDelta(isPut, underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
-//        double gamma = calcGamma(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
-//        double theta = calcTheta(isPut, underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
-//        double vega = calcVega(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
-//
-//        return getGreek(calcData, riskFreeInterestRate, contract, daysToExpiration, marketPrice, impliedVolatility, delta, gamma, theta, vega);
-//    }
-//
-//    private double calcImpliedVolatilityCall(double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice) {
-//        double low = LOW_VOL, high = HIGH_VOL;
-//        while ((high - low) > VOL_TOLERANCE){
-//            if (calcPriceCall(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, (high + low) / 2.0, dividendYield) > marketPrice)
-//                high = (high + low) / 2.0;
-//            else
-//                low = (high + low) / 2.0;
-//        }
-//
-//        return (high + low) / 2.0;
-//    }
-//
-//    private double calcImpliedVolatilityPut(double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice) {
-//        double low = LOW_VOL, high = HIGH_VOL;
-//        while ((high - low) > VOL_TOLERANCE){
-//            if (calcPricePut(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, (high + low) / 2.0, dividendYield) > marketPrice)
-//                high = (high + low) / 2.0;
-//            else
-//                low = (high + low) / 2.0;
-//        }
-//
-//        return (high + low) / 2.0;
-//    }
-//
-//    private double calcImpliedVolatility(boolean isPut, double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice){
-//        if (isPut)
-//            return calcImpliedVolatilityPut(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice);
-//        return calcImpliedVolatilityCall(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice);
-//    }
-//
-//    private double calcDeltaCall(double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma){
-//        return normalSDist( d1( underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield ) );
-//    }
-//
-//    private double calcDeltaPut(double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma){
-//        return calcDeltaCall( underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma) - 1;
-//    }
-//
-//    private double calcDelta(boolean isPut, double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma){
-//        if (isPut)
-//            return calcDeltaPut(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
-//        else return calcDeltaCall(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
-//    }
-//
-//    private double calcGamma(double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma){
-//        return phi( d1( underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield ) ) / ( underlyingPrice * sigma * Math.sqrt(daysToExpiration) );
-//    }
-//
-//    private double calcThetaCall(double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma){
-//        double term1 = underlyingPrice * phi( d1( underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield ) ) * sigma / ( 2 * Math.sqrt(daysToExpiration) );
-//        double term2 = riskFreeInterestRate * strike * Math.exp(-1.0 * riskFreeInterestRate * daysToExpiration) * normalSDist( d2( underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield ) );
-//        return ( - term1 - term2 ) / 365.25;
-//    }
-//
-//    private double calcThetaPut(double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma){
-//        double term1 = underlyingPrice * phi( d1( underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield ) ) * sigma / ( 2 * Math.sqrt(daysToExpiration) );
-//        double term2 = riskFreeInterestRate * strike * Math.exp(-1.0 * riskFreeInterestRate * daysToExpiration) * normalSDist( - d2( underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield ) );
-//        return ( - term1 + term2 ) / 365.25;
-//    }
-//
-//    private double calcTheta(boolean isPut, double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma){
-//        if (isPut)
-//            return calcThetaPut(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
-//        else return calcThetaCall(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
-//    }
-//
-//    private double calcVega(double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma){
-//        return 0.01 * underlyingPrice * Math.sqrt(daysToExpiration) * phi(d1(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield));
-//    }
-//
-//    private double d1(double underylyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double sigma, double dividendYield){
-//        double numerator = ( Math.log(underylyingPrice / strike) + (riskFreeInterestRate - dividendYield + 0.5 * Math.pow(sigma, 2.0) ) * daysToExpiration);
-//        double denominator = ( sigma * Math.sqrt(daysToExpiration));
-//        return numerator / denominator;
-//    }
-//
-//    private double d2(double underylyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double sigma, double dividendYield){
-//        return d1( underylyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield ) - ( sigma * Math.sqrt(daysToExpiration) );
-//    }
-//
-//    private double normalSDist(double z){
-//        if (z < MIN_Z_SCORE)
-//            return 0.0;
-//        if (z > MAX_Z_SCORE)
-//            return 1.0;
-//        double i = 3.0, sum = 0.0, term = z;
-//        while ((sum + term) != sum){
-//            sum = sum + term;
-//            term = term * z * z / i;
-//            i += 2.0;
-//        }
-//        return 0.5 + sum * phi(z);
-//    }
-//
-//    private double phi(double x){
-//        double numerator = Math.exp(-1.0 * x*x / 2.0);
-//        double denominator = Math.sqrt(2.0 * Math.PI);
-//        return numerator / denominator;
-//    }
-//
-//    private double calcPriceCall(double underylyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double sigma, double dividendYield){
-//        double d1 = d1( underylyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield );
-//        double discounted_underlying = Math.exp(-1.0 * dividendYield * daysToExpiration) * underylyingPrice;
-//        double probability_weighted_value_of_being_exercised = discounted_underlying * normalSDist( d1 );
-//
-//        double d2 = d1 - ( sigma * Math.sqrt(daysToExpiration) );
-//        double discounted_strike = Math.exp(-1.0 * riskFreeInterestRate * daysToExpiration) * strike;
-//        double probability_weighted_value_of_discounted_strike = discounted_strike * normalSDist( d2 );
-//
-//        return probability_weighted_value_of_being_exercised - probability_weighted_value_of_discounted_strike;
-//    }
-//
-//    private double calcPricePut(double underylyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double sigma, double dividendYield){
-//        double d2 = d2( underylyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield );
-//        double discounted_strike = strike * Math.exp(-1.0 * riskFreeInterestRate * daysToExpiration);
-//        double probabiltity_weighted_value_of_discounted_strike = discounted_strike * normalSDist( -1.0 * d2 );
-//
-//        double d1 = d2 + ( sigma * Math.sqrt(daysToExpiration) );
-//        double discounted_underlying = underylyingPrice * Math.exp(-1.0 * dividendYield * daysToExpiration);
-//        double probability_weighted_value_of_being_exercised = discounted_underlying * normalSDist( -1.0 * d1 );
-//
-//        return probabiltity_weighted_value_of_discounted_strike - probability_weighted_value_of_being_exercised;
-//    }
-//
-//    private double getDaysToExpiration(intrinio.realtime.options.Trade latestOptionTrade, intrinio.realtime.options.Quote latestOptionQuote){
-//        double latestActivity = Math.max(latestOptionTrade.timestamp(), latestOptionQuote.timestamp());
-//        long expirationAsUnixWholeSeconds = latestOptionTrade.getExpirationDate().toEpochSecond();
-//        double fractional = ((double)(latestOptionTrade.getExpirationDate().getNano())) / 1_000_000_000.0;
-//        double expiration = (((double)expirationAsUnixWholeSeconds) + fractional);
-//        return (expiration - latestActivity) / 86400.0; //86400 is seconds in a day
-//    }
-//
-//    private Greek getGreek(SecurityData calcData, Double riskFreeInterestRate, String contract, double daysToExpiration, double marketPrice, double impliedVolatility, double delta, double gamma, double theta, double vega){
-//        return new Greek(calcData.getTickerSymbol(),
-//                contract,
-//                calcData.getEquitiesTrade(),
-//                calcData.getAllOptionsContractData().get(contract).getTrade(),//latestOptionTrade,
-//                calcData.getAllOptionsContractData().get(contract).getQuote(),//latestOptionQuote,
-//                riskFreeInterestRate,
-//                calcData.getSupplementaryDatum(DividendYieldKey),
-//                daysToExpiration,
-//                marketPrice,
-//                impliedVolatility,
-//                delta,
-//                gamma,
-//                theta,
-//                vega,
-//                GreekCalculationMethod.BLACK_SCHOLES);
-//    }
-//}
+package intrinio.realtime.composite;
+
+import java.util.Date;
+
+public class BlackScholesGreekCalculator {
+    private static final double LOW_VOL = 0.0D;
+    private static final double HIGH_VOL = 5.0D;
+    private static final double VOL_TOLERANCE = 1e-12D;
+    private static final double MIN_Z_SCORE = -8.0D;
+    private static final double MAX_Z_SCORE = 8.0D;
+    private static final double root2Pi = Math.sqrt(2.0D * Math.PI);
+
+    public static Greek calculate(double riskFreeInterestRate, double dividendYield, double underlyingPrice, double latestEventUnixTimestamp, double marketPrice, boolean isPut, double strike, Date expirationDate) {
+        if (marketPrice <= 0.0D || riskFreeInterestRate <= 0.0D || underlyingPrice <= 0.0D)
+            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
+
+        double yearsToExpiration = getYearsToExpiration(latestEventUnixTimestamp, expirationDate);
+
+        if (yearsToExpiration <= 0.0D || strike <= 0.0D)
+            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
+
+        double impliedVolatility = calcImpliedVolatility(isPut, underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, marketPrice);
+        if (impliedVolatility == 0.0D)
+            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
+
+        // Compute common values once for all Greeks to avoid redundant calcs
+        double sqrtT = Math.sqrt(yearsToExpiration);
+        double d1 = d1(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, impliedVolatility, dividendYield);
+        double d2 = d1 - impliedVolatility * sqrtT;
+        double expQt = Math.exp(-dividendYield * yearsToExpiration);
+        double expRt = Math.exp(-riskFreeInterestRate * yearsToExpiration);
+        double nD1 = cumulativeNormalDistribution(d1);
+        double nD2 = cumulativeNormalDistribution(d2);
+        double phiD1 = normalPdf(d1);
+
+        double delta = isPut ? expQt * (nD1 - 1.0D) : expQt * nD1;
+        double gamma = expQt * phiD1 / (underlyingPrice * impliedVolatility * sqrtT);
+        double vega = 0.01D * underlyingPrice * expQt * sqrtT * phiD1;
+
+        // Theta with correct dividend adjustments
+        double term1 = expQt * underlyingPrice * phiD1 * impliedVolatility / (2.0D * sqrtT);
+        double term2 = riskFreeInterestRate * strike * expRt * (isPut ? (1.0D - nD2) : nD2);
+        double term3 = dividendYield * underlyingPrice * expQt * (isPut ? (1.0D - nD1) : nD1);
+        double theta = isPut ? (-term1 + term2 - term3) / 365.25D : (-term1 - term2 + term3) / 365.25D;
+
+        return new Greek(impliedVolatility, delta, gamma, theta, vega, true);
+    }
+
+    private static double calcImpliedVolatility(boolean isPut, double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice) {
+        double tol = 1e-10D;
+        double forward = underlyingPrice * Math.exp((riskFreeInterestRate - dividendYield) * yearsToExpiration);
+        double m = forward / strike;
+        double sigma = Math.sqrt(2.0D * Math.abs(Math.log(m)) / yearsToExpiration);
+        if (Double.isNaN(sigma) || sigma <= 0.0D) sigma = 0.3D;
+
+        int maxIter = 50;
+        for (int iter = 0; iter < maxIter; iter++) {
+            double price = isPut ? calcPricePut(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield) : calcPriceCall(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield);
+            double diff = price - marketPrice;
+            if (Math.abs(diff) < tol) break;
+
+            double d1 = d1(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield);
+            double vega = underlyingPrice * Math.exp(-dividendYield * yearsToExpiration) * Math.sqrt(yearsToExpiration) * normalPdf(d1);
+            if (Math.abs(vega) < 1e-10D) break; // avoid division by zero
+
+            sigma -= diff / vega;
+            if (sigma <= 0.0D) sigma = 0.0001D; // prevent negative or zero
+        }
+
+        return sigma;
+    }
+
+    private static double d1(double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double sigma, double dividendYield) {
+        double numerator = Math.log(underlyingPrice / strike) + (riskFreeInterestRate - dividendYield + 0.5D * sigma * sigma) * yearsToExpiration;
+        double denominator = sigma * Math.sqrt(yearsToExpiration);
+        return numerator / denominator;
+    }
+
+    private static double d2(double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double sigma, double dividendYield) {
+        return d1(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield) - sigma * Math.sqrt(yearsToExpiration);
+    }
+
+    private static double cumulativeNormalDistribution(double z) {
+        if (Math.abs(z) < 1.5D)
+            return cumulativeNormalDistributionSeries(z);
+
+        if (z > MAX_Z_SCORE) return 1.0D;
+        if (z < MIN_Z_SCORE) return 0.0D;
+
+        boolean isNegative = z < 0.0D;
+        if (isNegative) z = -z;
+
+        double t = 1.0D / (1.0D + 0.2316419D * z);
+        double poly = t * (0.319381530D + t * (-0.356563782D + t * (1.781477937D + t * (-1.821255978D + t * 1.330274429D))));
+
+        double pdf = Math.exp(-0.5D * z * z) / root2Pi;
+        double tail = pdf * poly;
+
+        return isNegative ? tail : 1.0D - tail;
+    }
+
+    private static double cumulativeNormalDistributionSeries(double z) {
+        double absZ = Math.abs(z);
+        double sum = 0.0D;
+        double term = absZ;
+        double i = 3.0D;
+        while (sum + term != sum) {
+            sum += term;
+            term = term * absZ * absZ / i;
+            i += 2.0D;
+        }
+        double pdf = Math.exp(-0.5D * absZ * absZ) / root2Pi;
+        double half = pdf * sum;
+        return z >= 0.0D ? 0.5D + half : 0.5D - half;
+    }
+
+    private static double normalPdf(double x) {
+        return Math.exp(-0.5D * x * x) / root2Pi;
+    }
+
+    private static double calcPriceCall(double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double sigma, double dividendYield) {
+        double d1 = d1(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield);
+        double d2 = d1 - sigma * Math.sqrt(yearsToExpiration);
+        double discountedUnderlying = Math.exp(-dividendYield * yearsToExpiration) * underlyingPrice;
+        double discountedStrike = Math.exp(-riskFreeInterestRate * yearsToExpiration) * strike;
+        return discountedUnderlying * cumulativeNormalDistribution(d1) - discountedStrike * cumulativeNormalDistribution(d2);
+    }
+
+    private static double calcPricePut(double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double sigma, double dividendYield) {
+        double d1 = d1(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield);
+        double d2 = d1 - sigma * Math.sqrt(yearsToExpiration);
+        double discountedUnderlying = Math.exp(-dividendYield * yearsToExpiration) * underlyingPrice;
+        double discountedStrike = Math.exp(-riskFreeInterestRate * yearsToExpiration) * strike;
+        return discountedStrike * cumulativeNormalDistribution(-d2) - discountedUnderlying * cumulativeNormalDistribution(-d1);
+    }
+
+    private static double getYearsToExpiration(double latestActivityUnixTime, Date expirationDate) {
+        double expiration = expirationDate.getTime() / 1000.0D;
+        return (expiration - latestActivityUnixTime) / 31557600.0D;
+    }
+}

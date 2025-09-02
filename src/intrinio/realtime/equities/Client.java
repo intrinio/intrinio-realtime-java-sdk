@@ -52,7 +52,7 @@ public class Client implements WebSocket.Listener {
 	private Thread[] processDataThreads;
 	private boolean isCancellationRequested = false;
 	private String HeaderClientInformationKey = "Client-Information";
-	private String HeaderClientInformationValue = "IntrinioRealtimeJavaSDKv7.2";
+	private String HeaderClientInformationValue = "IntrinioRealtimeJavaSDKv7.3";
 	private String HeaderMessageVersionKey = "UseNewEquitiesFormat";
 	private String HeaderMessageVersionValue = "v2";
 	//endregion Data Members
@@ -127,6 +127,8 @@ public class Client implements WebSocket.Listener {
 				break;
 			case CBOE_ONE: authUrl = "https://cboe-one.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
 				break;
+			case EQUITIES_EDGE: authUrl = "https://equities-edge.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
+				break;
 			case MANUAL: authUrl = "http://" + config.getEquitiesIpAddress() + "/auth?api_key=" + config.getEquitiesApiKey();
 				break;
 			default: throw new Exception("Provider not specified!");
@@ -147,6 +149,8 @@ public class Client implements WebSocket.Listener {
 			case NASDAQ_BASIC: wsUrl = "wss://realtime-nasdaq-basic.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
 				break;
 			case CBOE_ONE: wsUrl = "wss://cboe-one.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
+				break;
+			case EQUITIES_EDGE: wsUrl = "wss://equities-edge.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
 				break;
 			case MANUAL: wsUrl = "ws://" + config.getEquitiesIpAddress() + "/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
 				break;

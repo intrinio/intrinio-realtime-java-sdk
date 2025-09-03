@@ -28,7 +28,7 @@ public class CompositeSampleApp {
         }
 
         //store the most recent values in a simple non-transactional cache that gives contextual information with the event.
-        intrinio.realtime.composite.DataCache currentDataCache = new CurrentDataCache();
+        intrinio.realtime.composite.DataCache currentDataCache = DataCacheFactory.create();
 
         //Initialize Options Client and wire it to the cache
         //intrinio.realtime.options.OnUnusualActivity optionsUnusualActivityHandler = null;
@@ -44,7 +44,7 @@ public class CompositeSampleApp {
         intrinio.realtime.equities.Client equitiesClient = new intrinio.realtime.equities.Client(equitiesTradeHandler, equitiesQuoteHandler, equitiesConfig);
 
         //Display trade events with context
-        currentDataCache.setOnEquitiesTradeUpdated((SecurityData securityData, DataCache dataCache) -> {
+        currentDataCache.setEquitiesTradeUpdatedCallback((SecurityData securityData, DataCache dataCache, intrinio.realtime.equities.Trade trade) -> {
             intrinio.realtime.equities.Client.Log(securityData.getTickerSymbol() + " had a trade and also has " + securityData.getAllOptionsContractData().size() + " active contracts");
         });
 

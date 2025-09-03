@@ -35,7 +35,7 @@ public class Client implements WebSocket.Listener {
 	private final Lock dataBucketLock = new ReentrantLock();
 	private final LinkedBlockingDeque<Tuple<byte[], Boolean>> dataBucket = new LinkedBlockingDeque<Tuple<byte[], Boolean>>();
 	private final WebSocketState wsState = new WebSocketState();
-	private final String Version = "IntrinioRealtimeOptionsJavaSDKv7.2";
+	private final String Version = "IntrinioRealtimeOptionsJavaSDKv8.0";
 	//endregion Final data members
 
 	//region Data Members
@@ -124,6 +124,8 @@ public class Client implements WebSocket.Listener {
 		switch (config.getOptionsProvider()) {
 			case OPRA: authUrl = "https://realtime-options.intrinio.com/auth?api_key=" + config.getOptionsApiKey();
 				break;
+			case OPTIONS_EDGE: authUrl = "https://options-edge.intrinio.com/auth?api_key=" + config.getOptionsApiKey();
+				break;
 			case MANUAL: authUrl = "http://" + config.getOptionsIpAddress() + "/auth?api_key=" + config.getOptionsApiKey();
 				break;
 			default: throw new Exception("Provider not specified!");
@@ -135,6 +137,8 @@ public class Client implements WebSocket.Listener {
 		String wsUrl;
 		switch (config.getOptionsProvider()) {
 			case OPRA: wsUrl = "wss://realtime-options.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + (this.config.isDelayed() ? "&delayed=true" : "");
+				break;
+			case OPTIONS_EDGE: wsUrl = "wss://options-edge.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + (this.config.isDelayed() ? "&delayed=true" : "");
 				break;
 			case MANUAL: wsUrl = "ws://" + config.getOptionsIpAddress() + "/socket/websocket?vsn=1.0.0&token=" + token + (this.config.isDelayed() ? "&delayed=true" : "");
 				break;

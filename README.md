@@ -1,5 +1,5 @@
 # Intrinio Java SDK for Real-Time Stock Prices
-SDK for working with Intrinio's realtime IEX, NASDAQ Basic, CBOE One, delayed SIP prices, and realtime/delayed [OPRA](https://www.opraplan.com/) options feeds.
+SDK for working with Intrinio's realtime IEX, NASDAQ Basic, CBOE One, delayed SIP prices, and realtime/delayed [OPRA](https://www.opraplan.com/) and Options Edge options feeds.
 
 [Intrinio](https://intrinio.com/) provides real-time and delayed stock prices via a two-way WebSocket connection. To get started, [subscribe to a real-time data feed](https://docs.intrinio.com/tutorial/websocket) and follow the instructions below.
 
@@ -87,6 +87,7 @@ public record Trade(String symbol, SubProvider subProvider, char marketCenter, d
   *    **`NASDAQ_BASIC`** - NASDAQ Basic in the NASDAQ_BASIC provider.
   *    **`IEX`** - From the IEX exchange in the REALTIME provider.
   *    **`CBOE_ONE`** - From the CBOE One exchanges provider.
+  *    **`EQUITIES_EDGE`** - From the Equities Edge provider.
 * **marketCenter** - Provides the market center
 * **price** - the price in USD
 * **size** - the size of the last trade.
@@ -113,6 +114,7 @@ public record Quote(QuoteType type, String symbol, SubProvider subProvider, char
   *    **`NASDAQ_BASIC`** - NASDAQ Basic in the NASDAQ_BASIC provider.
   *    **`IEX`** - From the IEX exchange in the REALTIME provider.
   *    **`CBOE_ONE`** - From the CBOE One exchanges provider.
+  *    **`EQUITIES_EDGE`** - From the Equities Edge provider.
 * **marketCenter** - Provides the market center
 * **symbol** - Ticker symbol.
 * **price** - the price in USD
@@ -387,7 +389,7 @@ client.leave()
 ```json
 {
 	"apiKey": "",
-	"provider": "IEX", //or DELAYED_SIP or NASDAQ_BASIC or CBOE_ONE or MANUAL
+	"provider": "IEX", //or DELAYED_SIP or NASDAQ_BASIC or CBOE_ONE or EQUITIES_EDGE or MANUAL
 	"symbols": [ "AAPL", "MSFT", "GOOG" ], //This is a list of individual tickers to subscribe to, or "lobby" to subscribe to all at once (firehose).
 	"tradesOnly": true, //This indicates whether you only want trade events (true) or you want trade, ask, and bid events (false).
 	"numThreads": 4 //The number of threads to use for processing events.
@@ -447,7 +449,7 @@ If a subscription has already been created with one of the `join` methods, data 
 ```json
 {
 	"apiKey": "",
-	"provider": "OPRA", //OPRA
+	"provider": "OPRA", //OPRA, OPTIONS_EDGE
 	"symbols": [ "GOOG__210917C01040000", "MSFT", "AAPL__210917C00130000", "SPY" ], //Individual contracts, or option chains to subscribe to all contracts under a symbol.
 	"numThreads": 4, //The number of threads to use for processing events.
     "delayed": false //If you have realtime access but want to force 15minute delayed, set this to true.

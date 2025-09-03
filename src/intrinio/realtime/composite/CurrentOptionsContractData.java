@@ -1,126 +1,209 @@
 package intrinio.realtime.composite;
 
-import java.util.Map;
+import intrinio.realtime.options.Trade;
+import intrinio.realtime.options.Quote;
+import intrinio.realtime.options.Refresh;
+import intrinio.realtime.options.UnusualActivity;
+import intrinio.realtime.options.QuoteType;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Collections;
+import java.util.Map;
 
-public class CurrentOptionsContractData implements OptionsContractData {
+/**
+ * Not for Use yet. Subject to change.
+ */
+class CurrentOptionsContractData implements OptionsContractData {
     private final String contract;
-    private volatile intrinio.realtime.options.Trade latestTrade;
-    private volatile intrinio.realtime.options.Quote latestQuote;
-    private volatile intrinio.realtime.options.Refresh latestRefresh;
-    private final ConcurrentHashMap<String, Double> supplementaryData;
-    private final Map<String, Double> readonlySupplementaryData;
+    private Trade latestTrade;
+    private Quote latestQuote;
+    private Refresh latestRefresh;
+    private UnusualActivity latestUnusualActivity;
+    private final ConcurrentHashMap<String, Double> supplementaryData = new ConcurrentHashMap<>();
+    private final Map<String, Double> readonlySupplementaryData = Collections.unmodifiableMap(supplementaryData);
+    private final ConcurrentHashMap<String, Greek> greekData = new ConcurrentHashMap<>();
+    private final Map<String, Greek> readonlyGreekData = Collections.unmodifiableMap(greekData);
 
-    public CurrentOptionsContractData(String contract, intrinio.realtime.options.Trade latestTrade, intrinio.realtime.options.Quote latestQuote, intrinio.realtime.options.Refresh latestRefresh){
+    public CurrentOptionsContractData(String contract,
+                                      Trade latestTrade,
+                                      Quote latestQuote,
+                                      Refresh latestRefresh,
+                                      UnusualActivity latestUnusualActivity) {
         this.contract = contract;
         this.latestTrade = latestTrade;
         this.latestQuote = latestQuote;
         this.latestRefresh = latestRefresh;
-        this.supplementaryData = new ConcurrentHashMap<String, Double>();
-        this.readonlySupplementaryData = java.util.Collections.unmodifiableMap(supplementaryData);
+        this.latestUnusualActivity = latestUnusualActivity;
     }
 
-    public String getContract(){
+    @Override
+    public String getContract() {
         return this.contract;
     }
 
-    public intrinio.realtime.options.Trade getTrade(){
+    @Override
+    public Trade getLatestTrade() {
         return this.latestTrade;
     }
 
-    public intrinio.realtime.options.Quote getQuote(){
+    @Override
+    public Quote getLatestQuote() {
         return this.latestQuote;
     }
 
-    public intrinio.realtime.options.Refresh getRefresh(){
+    @Override
+    public Refresh getLatestRefresh() {
         return this.latestRefresh;
     }
 
-    public boolean setTrade(intrinio.realtime.options.Trade trade){
+    @Override
+    public UnusualActivity getLatestUnusualActivity() {
+        return this.latestUnusualActivity;
+    }
+
+    @Override
+    public boolean setTrade(Trade trade) {
         //dirty set
-        if ((latestTrade == null) || (trade.timestamp() > latestTrade.timestamp())) {
-            latestTrade = trade;
+        if (this.latestTrade == null || (trade != null && trade.timestamp() > this.latestTrade.timestamp())) {
+            this.latestTrade = trade;
             return true;
         }
         return false;
     }
 
-    boolean setTrade(intrinio.realtime.options.Trade trade, OnOptionsTradeUpdated onOptionsTradeUpdated, SecurityData securityData, DataCache dataCache){
-        boolean isSet = this.setTrade(trade);
-        if (isSet && onOptionsTradeUpdated != null){
-            try{
-                onOptionsTradeUpdated.onOptionsTradeUpdated(this, dataCache, securityData);
-            }catch (Exception e){
-                Log("Error in onOptionsTradeUpdated Callback: " + e.getMessage());
+    @Override
+    public boolean setTrade(Trade trade, OnOptionsTradeUpdated onOptionsTradeUpdated, SecurityData securityData, DataCache dataCache) {
+        boolean isSet = setTrade(trade);
+        if (isSet && onOptionsTradeUpdated != null) {
+            try {
+                onOptionsTradeUpdated.onOptionsTradeUpdated(this, dataCache, securityData, trade);
+            } catch (Exception e) {
+                Log("Error in OnOptionsTradeUpdated Callback: " + e.getMessage());
             }
         }
         return isSet;
     }
 
-    public boolean setQuote(intrinio.realtime.options.Quote quote){
+    @Override
+    public boolean setQuote(Quote quote) {
         //dirty set
-        if ((latestQuote == null) || (quote.timestamp() > latestQuote.timestamp())) {
-            latestQuote = quote;
+        if (this.latestQuote == null || (quote != null && quote.timestamp() > this.latestQuote.timestamp())) {
+            this.latestQuote = quote;
             return true;
         }
         return false;
     }
 
-    boolean setQuote(intrinio.realtime.options.Quote quote, OnOptionsQuoteUpdated onOptionsQuoteUpdated, SecurityData securityData, DataCache dataCache){
+    @Override
+    public boolean setQuote(Quote quote, OnOptionsQuoteUpdated onOptionsQuoteUpdated, SecurityData securityData, DataCache dataCache) {
         boolean isSet = this.setQuote(quote);
-        if (isSet && onOptionsQuoteUpdated != null){
-            try{
-                onOptionsQuoteUpdated.onOptionsQuoteUpdated(this, dataCache, securityData);
-            }catch (Exception e){
+        if (isSet && onOptionsQuoteUpdated != null) {
+            try {
+                onOptionsQuoteUpdated.onOptionsQuoteUpdated(this, dataCache, securityData, quote);
+            } catch (Exception e) {
                 Log("Error in onOptionsQuoteUpdated Callback: " + e.getMessage());
             }
         }
         return isSet;
     }
 
-    public boolean setRefresh(intrinio.realtime.options.Refresh refresh){
-        latestRefresh = refresh;
+    @Override
+    public boolean setRefresh(Refresh refresh) {
+        this.latestRefresh = refresh;
         return true;
     }
 
-    boolean setRefresh(intrinio.realtime.options.Refresh refresh, OnOptionsRefreshUpdated onOptionsRefreshUpdated, SecurityData securityData, DataCache dataCache){
+    @Override
+    public boolean setRefresh(Refresh refresh, OnOptionsRefreshUpdated onOptionsRefreshUpdated, SecurityData securityData, DataCache dataCache) {
         boolean isSet = this.setRefresh(refresh);
-        if (isSet && onOptionsRefreshUpdated != null){
-            try{
-                onOptionsRefreshUpdated.onOptionsRefreshUpdated(this, dataCache, securityData);
-            }catch (Exception e){
+        if (isSet && onOptionsRefreshUpdated != null) {
+            try {
+                onOptionsRefreshUpdated.onOptionsRefreshUpdated(this, dataCache, securityData, refresh);
+            } catch (Exception e) {
                 Log("Error in onOptionsRefreshUpdated Callback: " + e.getMessage());
             }
         }
         return isSet;
     }
 
-    public Double getSupplementaryDatum(String key){
+    @Override
+    public boolean setUnusualActivity(UnusualActivity unusualActivity) {
+        this.latestUnusualActivity = unusualActivity;
+        return true;
+    }
+
+    @Override
+    public boolean setUnusualActivity(UnusualActivity unusualActivity, OnOptionsUnusualActivityUpdated onOptionsUnusualActivityUpdated, SecurityData securityData, DataCache dataCache) {
+        boolean isSet = this.setUnusualActivity(unusualActivity);
+        if (isSet && onOptionsUnusualActivityUpdated != null) {
+            try {
+                onOptionsUnusualActivityUpdated.onOptionsUnusualActivityUpdated(this, dataCache, securityData, unusualActivity);
+            } catch (Exception e) {
+                Log("Error in onOptionsUnusualActivityUpdated Callback: " + e.getMessage());
+            }
+        }
+        return isSet;
+    }
+
+    @Override
+    public Double getSupplementaryDatum(String key) {
         return supplementaryData.getOrDefault(key, null);
     }
 
-    public boolean setSupplementaryDatum(String key, double datum){
-        return datum == supplementaryData.compute(key, (k, oldValue) -> datum);
+    @Override
+    public boolean setSupplementaryDatum(String key, Double datum, SupplementalDatumUpdate update) {
+        Double newValue = supplementaryData.compute(key, (k, oldValue) -> update.supplementalDatumUpdate(k, oldValue, datum));
+        return java.util.Objects.equals(datum, newValue);
     }
 
-    boolean setSupplementaryDatum(String key, double datum, OnOptionsContractSupplementalDatumUpdated onOptionsContractSupplementalDatumUpdated, SecurityData securityData, DataCache dataCache){
-        boolean result = setSupplementaryDatum(key, datum);
-        if (result && onOptionsContractSupplementalDatumUpdated != null){
-            try{
+    @Override
+    public boolean setSupplementaryDatum(String key, Double datum, OnOptionsContractSupplementalDatumUpdated onOptionsContractSupplementalDatumUpdated, SecurityData securityData, DataCache dataCache, SupplementalDatumUpdate update) {
+        boolean result = setSupplementaryDatum(key, datum, update);
+        if (result && onOptionsContractSupplementalDatumUpdated != null) {
+            try {
                 onOptionsContractSupplementalDatumUpdated.onOptionsContractSupplementalDatumUpdated(key, datum, this, securityData, dataCache);
-            }catch (Exception e){
+            } catch (Exception e) {
                 Log("Error in onOptionsContractSupplementalDatumUpdated Callback: " + e.getMessage());
             }
         }
         return result;
     }
 
-    public Map<String, Double> getAllSupplementaryData(){return readonlySupplementaryData;}
+    @Override
+    public Map<String, Double> getAllSupplementaryData() {
+        return readonlySupplementaryData;
+    }
 
-    //region Private Methods
+    @Override
+    public Greek getGreekData(String key) {
+        return greekData.getOrDefault(key, null);
+    }
+
+    @Override
+    public boolean setGreekData(String key, Greek datum, GreekDataUpdate update) {
+        Greek newValue = greekData.compute(key, (k, oldValue) -> update.greekDataUpdate(k, oldValue, datum));
+        return (newValue != null && datum != null && newValue.equals(datum))
+                || (newValue == null && datum == null);
+    }
+
+    @Override
+    public boolean setGreekData(String key, Greek datum, OnOptionsContractGreekDataUpdated onOptionsContractGreekDataUpdated, SecurityData securityData, DataCache dataCache, GreekDataUpdate update) {
+        boolean result = setGreekData(key, datum, update);
+        if (result && onOptionsContractGreekDataUpdated != null) {
+            try {
+                onOptionsContractGreekDataUpdated.onOptionsContractGreekDataUpdated(key, datum, this, securityData, dataCache);
+            } catch (Exception e) {
+                Log("Error in onOptionsContractGreekDataUpdated Callback: " + e.getMessage());
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public Map<String, Greek> getAllGreekData() {
+        return readonlyGreekData;
+    }
+
     private void Log(String message){
         System.out.println(message);
     }
-
-    //endregion Private Methods
 }

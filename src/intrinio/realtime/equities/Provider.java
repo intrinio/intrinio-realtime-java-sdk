@@ -7,5 +7,6 @@ public enum Provider {
 	DELAYED_SIP,
 	NASDAQ_BASIC,
 	CBOE_ONE,
-	IEX
+	IEX,
+	EQUITIES_EDGE
 }

@@ -34,7 +34,7 @@ Options Client:
 * 0.5 ms latency
 
 ## Docker
-Add your API key to the config.json file in src/intrinio.realtime.equities or src/intrinio.realtime.options, uncomment the desired example in SampleApp.java, then
+Add your API key to the config.json file in src/intrinio/realtime/equities or src/intrinio/realtime/options, uncomment the desired example in SampleApp.java, then
 ```
 docker compose build
 docker compose run example

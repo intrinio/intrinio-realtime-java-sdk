@@ -18,10 +18,10 @@ public class OptionsSampleApp {
         OptionsUnusualActivityHandler optionsUnusualActivityHandler = new OptionsUnusualActivityHandler();
 
         // You can either create a config class or default to using the intrinio/config.json file
-        intrinio.realtime.options.Config config = null;
-        try {config = new intrinio.realtime.options.Config("apiKeyHere", intrinio.realtime.options.Provider.OPRA, null, new String[]{"GOOG", "AAPL__210917C00130000"}, 8, false);} catch (Exception e) {e.printStackTrace();}
-        intrinio.realtime.options.Client client = new intrinio.realtime.options.Client(config);
-        //intrinio.realtime.options.Client client = new intrinio.realtime.options.Client();
+        //intrinio.realtime.options.Config config = null;
+        //try {config = new intrinio.realtime.options.Config("apiKeyHere", intrinio.realtime.options.Provider.OPRA, null, new String[]{"GOOG", "AAPL__210917C00130000"}, 8, false);} catch (Exception e) {e.printStackTrace();}
+        //intrinio.realtime.options.Client client = new intrinio.realtime.options.Client(config);
+        intrinio.realtime.options.Client client = new intrinio.realtime.options.Client();
 
         // Register a callback for a graceful shutdown
         Runtime.getRuntime().addShutdownHook(new Thread( new Runnable() {

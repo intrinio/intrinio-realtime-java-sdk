@@ -45,6 +45,11 @@ public record Trade
 			", Conditions: " + this.conditions +
 			")";
 	}
+
+	public MarketCenter getMappedMarketCenter()
+	{
+		return MarketCenterMapper.map(marketCenter, subProvider);
+	}
 	
 	public static Trade parse(byte[] bytes) {
 		int symbolLength = bytes[2];

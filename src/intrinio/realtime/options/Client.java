@@ -35,7 +35,7 @@ public class Client implements WebSocket.Listener {
 	private final Lock dataBucketLock = new ReentrantLock();
 	private final LinkedBlockingDeque<Tuple<byte[], Boolean>> dataBucket = new LinkedBlockingDeque<Tuple<byte[], Boolean>>();
 	private final WebSocketState wsState = new WebSocketState();
-	private final String Version = "IntrinioRealtimeOptionsJavaSDKv8.1";
+	private final String Version = "IntrinioRealtimeOptionsJavaSDKv8.2";
 	//endregion Final data members
 
 	//region Data Members

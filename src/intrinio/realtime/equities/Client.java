@@ -52,7 +52,7 @@ public class Client implements WebSocket.Listener {
 	private Thread[] processDataThreads;
 	private boolean isCancellationRequested = false;
 	private String HeaderClientInformationKey = "Client-Information";
-	private String HeaderClientInformationValue = "IntrinioRealtimeJavaSDKv8.1";
+	private String HeaderClientInformationValue = "IntrinioRealtimeJavaSDKv8.2";
 	private String HeaderMessageVersionKey = "UseNewEquitiesFormat";
 	private String HeaderMessageVersionValue = "v2";
 	//endregion Data Members

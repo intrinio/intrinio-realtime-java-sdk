@@ -59,13 +59,24 @@ public class Config {
 	public boolean isDelayed() { return delayed; }
 	
 	public String toString() {
+		String maskedApiKey = maskApiKey(this.optionsApiKey);
 		return String.format("apiKey = %s, provider = %s, ipAddress = %s, delayed = %s, symbols = %s, numThreads = %d",
-				this.optionsApiKey,
+				maskedApiKey,
 				this.optionsProvider,
 				this.optionsIpAddress,
 				this.delayed,
 				(this.optionsSymbols == null ? "[]" : "[ " + String.join(", ", this.optionsSymbols) + " ]"),
 				this.optionsNumThreads);
+	}
+
+	private static String maskApiKey(String apiKey) {
+		if (apiKey == null || apiKey.isEmpty()) {
+			return "****";
+		}
+		if (apiKey.length() <= 4) {
+			return "****" + apiKey;
+		}
+		return "****" + apiKey.substring(apiKey.length() - 4);
 	}
 
 	public static Config load() {

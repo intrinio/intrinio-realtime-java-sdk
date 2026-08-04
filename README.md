@@ -64,6 +64,10 @@ For a sample Java project see: [intrinio-realtime-java-sdk](https://github.com/i
 ## Options and Equities concurrently Example Usage
 * See [Composite Sample Websocket](https://github.com/intrinio/intrinio-realtime-java-sdk/blob/master/src/SampleApp/CompositeSampleApp.java) and [Sample Websocket](https://github.com/intrinio/intrinio-realtime-java-sdk/blob/master/src/SampleApp/SampleApp.java)
 
+## Realtime Greeks Example Usage
+* See [Greek Sample App](https://github.com/intrinio/intrinio-realtime-java-sdk/blob/master/src/SampleApp/GreekSampleApp.java) and [Sample Websocket](https://github.com/intrinio/intrinio-realtime-java-sdk/blob/master/src/SampleApp/SampleApp.java)
+* Uses `intrinio.realtime.composite.DataCache` + `GreekClient` with Black–Scholes calculation (mirrors the C# composite Greek client). Wire equities and options trades/quotes into the shared cache and `GreekClient` handlers; enable via `GreekSampleApp.run(args)` in `SampleApp.java`.
+
 ## Handling Events
 
 There are thousands of securities and millions of options contracts, each with their own feed of activity.  We highly encourage you to make your trade and quote handlers has short as possible and follow a queue pattern so your app can handle the volume of activity.

@@ -13,12 +13,14 @@ import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -33,6 +35,7 @@ public class Client implements WebSocket.Listener {
 	//region Final Data Members
 	private final String FirehoseChannelName = "lobby";
 	private final long[] selfHealBackoffs = {1000, 30000, 60000, 300000, 600000};
+	private final long connectTimeoutMs = 30_000L;
 	private final ReentrantReadWriteLock tLock = new ReentrantReadWriteLock();
 	private final ReentrantReadWriteLock wsLock = new ReentrantReadWriteLock();
 	private final LinkedBlockingDeque<byte[]> data = new LinkedBlockingDeque<>();
@@ -185,7 +188,7 @@ public class Client implements WebSocket.Listener {
 					try {
 						new Thread(() -> {
 							try { Thread.sleep(1000); } catch (Exception e){}
-							this.doWithRetryBackoff(() -> reconnect());
+							this.runReconnectLoop();
 						}).start();
 					}catch (Exception e){}
 				}
@@ -461,43 +464,103 @@ public class Client implements WebSocket.Listener {
 		}
 	}
 
+	private void abortWebSocket(WebSocket ws) {
+		if (ws == null) {
+			return;
+		}
+		try {
+			ws.abort();
+		} catch (Exception e) {}
+	}
+
+	private void abortConnectAttempt(CompletableFuture<WebSocket> task) {
+		if (task == null) {
+			return;
+		}
+		task.cancel(true);
+		task.whenComplete((ws, err) -> abortWebSocket(ws));
+	}
+
+	private void runReconnectLoop() {
+		while (!isCancellationRequested) {
+			try {
+				this.doWithRetryBackoff(() -> reconnect());
+				return;
+			} catch (Exception e) {
+				Client.Log("Websocket - Reconnect loop ended unexpectedly: %s", e.getMessage());
+				wsLock.writeLock().lock();
+				try {
+					this.wsState.setReconnecting(false);
+				} finally {
+					wsLock.writeLock().unlock();
+				}
+				if (isCancellationRequested) {
+					return;
+				}
+				try {
+					Thread.sleep(this.selfHealBackoffs[0]);
+				} catch (Exception ignored) {
+					return;
+				}
+			}
+		}
+	}
+
 	private void initializeWebSocket(String token) {
+		Client.Log("Websocket - Connecting...");
+		String wsUrl;
+		try {
+			wsUrl = this.getWebSocketUrl(token);
+		} catch (Exception e) {
+			Client.Log("Initialization Failure. " + e.getMessage());
+			return;
+		}
+		URI uri;
+		try {
+			uri = new URI(wsUrl);
+		} catch (URISyntaxException e) {
+			Client.Log("Initialization Failure. Bad URL (%s). %s", wsUrl, e.getMessage());
+			return;
+		}
+
+		WebSocket previous;
+		CompletableFuture<WebSocket> task;
 		wsLock.writeLock().lock();
 		try {
-			Client.Log("Websocket - Connecting...");
-			WebSocketState wsState = new WebSocketState();
-			String wsUrl;
-			try {
-				wsUrl = this.getWebSocketUrl(token);
-			} catch (Exception e) {
-				Client.Log("Initialization Failure. " + e.getMessage());
-				return;
-			}
-			URI uri = null;
-			try {
-				uri = new URI(wsUrl);
-			} catch (URISyntaxException e) {
-				Client.Log("Initialization Failure. Bad URL (%s). %s", wsUrl, e.getMessage());
-				return;
-			}
-			HttpClient httpClient = HttpClient.newHttpClient();
-			CompletableFuture<WebSocket> task =
-				httpClient.newWebSocketBuilder()
+			previous = this.wsState.getWebSocket();
+			HttpClient httpClient = HttpClient.newBuilder()
+				.connectTimeout(Duration.ofMillis(this.connectTimeoutMs))
+				.build();
+			task = httpClient.newWebSocketBuilder()
 				.header(HeaderMessageVersionKey, HeaderMessageVersionValue)
 				.header(HeaderClientInformationKey, HeaderClientInformationValue)
 				.buildAsync(uri, (WebSocket.Listener) this);
-			try {
-				WebSocket ws = task.get();
-				this.wsState.setWebSocket(ws);
-				Client.Log("Websocket - Connected");
-				this.onWebSocketConnected(ws, this.wsState);
-			} catch (ExecutionException e) {
-				Client.Log("Initialization Failure. Could not establish connection. %s", e.getMessage());
-			} catch (InterruptedException e) {
-				Client.Log("Initialization Failure. Thread interrupted. %s", e.getMessage());
-			}
 		} finally {
 			wsLock.writeLock().unlock();
+		}
+
+		abortWebSocket(previous);
+
+		try {
+			WebSocket ws = task.get(this.connectTimeoutMs, TimeUnit.MILLISECONDS);
+			wsLock.writeLock().lock();
+			try {
+				this.wsState.setWebSocket(ws);
+			} finally {
+				wsLock.writeLock().unlock();
+			}
+			Client.Log("Websocket - Connected");
+			this.onWebSocketConnected(ws, this.wsState);
+		} catch (TimeoutException e) {
+			Client.Log("Initialization Failure. Connection timed out after %d ms.", this.connectTimeoutMs);
+			abortConnectAttempt(task);
+		} catch (ExecutionException e) {
+			Client.Log("Initialization Failure. Could not establish connection. %s", e.getMessage());
+			abortConnectAttempt(task);
+		} catch (InterruptedException e) {
+			Client.Log("Initialization Failure. Thread interrupted. %s", e.getMessage());
+			Thread.currentThread().interrupt();
+			abortConnectAttempt(task);
 		}
 	}
 
@@ -505,15 +568,19 @@ public class Client implements WebSocket.Listener {
 		Client.Log("Websocket - Reconnecting...");
 		if (this.wsState.isReady()) {
 			return true;
-		} else {
-			this.wsLock.writeLock().lock();
-			try {
-				this.wsState.setReconnecting(true);
-			} finally {
-				this.wsLock.writeLock().unlock();
-			}
+		}
+		this.wsLock.writeLock().lock();
+		try {
+			this.wsState.setReconnecting(true);
+		} finally {
+			this.wsLock.writeLock().unlock();
+		}
+		try {
 			String token = this.fetchToken();
 			initializeWebSocket(token);
+			return this.wsState.isReady();
+		} catch (Exception e) {
+			Client.Log("Websocket - Reconnect attempt failed: %s", e.getMessage());
 			return false;
 		}
 	}
@@ -652,18 +719,23 @@ public class Client implements WebSocket.Listener {
 
 	private void doWithRetryBackoff(BooleanSupplier callback) {
 		int i = 0;
-		long backoff = this.selfHealBackoffs[i];
-		boolean success = callback.getAsBoolean();
-		while (!success) {
+		while (!this.isCancellationRequested) {
 			try {
-				Thread.sleep(backoff);
-				i = Math.min(i + 1, this.selfHealBackoffs.length - 1);
-				backoff = this.selfHealBackoffs[i];
-				success = callback.getAsBoolean();
-			} catch (InterruptedException e) {}
-			catch (Exception e) {
-				//Client.Log("Error.  Retrying...");
+				if (callback.getAsBoolean()) {
+					return;
+				}
+			} catch (Exception e) {
+				Client.Log("Websocket - Attempt failed: %s", e.getMessage());
 			}
+			if (this.isCancellationRequested) {
+				return;
+			}
+			try {
+				Thread.sleep(this.selfHealBackoffs[i]);
+			} catch (InterruptedException e) {
+				return;
+			}
+			i = Math.min(i + 1, this.selfHealBackoffs.length - 1);
 		}
 	}
 	//endregion Private Methods

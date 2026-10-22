@@ -71,6 +71,8 @@ For a sample Java project see: [intrinio-realtime-java-sdk](https://github.com/i
 ## Handling Events
 
 There are thousands of securities and millions of options contracts, each with their own feed of activity.  We highly encourage you to make your trade and quote handlers has short as possible and follow a queue pattern so your app can handle the volume of activity.
+
+Internally, the equities client places trades and quotes on separate queues and drains trades first. The options client likewise uses separate queues for trades, unusual activity, refreshes, and quotes, in that priority order. This keeps high-volume quote traffic from delaying trade callbacks.
 Note that quotes (ask and bid updates) comprise ~90% of the volume of the entire feed. Be cautious when deciding to receive ask/bid quote updates.
 
 ## Data Format

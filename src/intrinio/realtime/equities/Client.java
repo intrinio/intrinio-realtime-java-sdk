@@ -1,244 +1,158 @@
 package intrinio.realtime.equities;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.ProtocolException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.concurrent.TimeUnit;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.BooleanSupplier;
-import java.util.LinkedList;
-import java.util.Queue;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class Client implements WebSocket.Listener {
-	//region Final Data Members
-	private final String FirehoseChannelName = "lobby";
-	private final long[] selfHealBackoffs = {1000, 30000, 60000, 300000, 600000};
-	private final long connectTimeoutMs = 30_000L;
-	private final ReentrantReadWriteLock tLock = new ReentrantReadWriteLock();
-	private final ReentrantReadWriteLock wsLock = new ReentrantReadWriteLock();
-	private final LinkedBlockingDeque<byte[]> data = new LinkedBlockingDeque<>();
-	private final HashSet<Channel> channels = new HashSet<Channel>();
-	private final WebSocketState wsState = new WebSocketState();
-	private final LinkedBlockingDeque<Tuple<byte[], Boolean>> dataBucket = new LinkedBlockingDeque<Tuple<byte[], Boolean>>();
-	private final Lock dataBucketLock = new ReentrantLock();;
-	//endregion Final Data Members
+	private static final String FIREHOSE_CHANNEL_NAME = "lobby";
+	private static final long[] SELF_HEAL_BACKOFFS = {1_000, 30_000, 60_000, 300_000, 600_000};
+	private static final int CONNECT_TIMEOUT_MS = 30_000;
+	private static final int THREAD_JOIN_TIMEOUT_MS = 10_000;
+	private static final String HEADER_CLIENT_INFORMATION_KEY = "Client-Information";
+	private static final String HEADER_CLIENT_INFORMATION_VALUE = "IntrinioRealtimeJavaSDKv9.1";
+	private static final String HEADER_MESSAGE_VERSION_KEY = "UseNewEquitiesFormat";
+	private static final String HEADER_MESSAGE_VERSION_VALUE = "v2";
 
-	//region Data Members
+	private final Set<Channel> channels = ConcurrentHashMap.newKeySet();
+	private final LinkedBlockingDeque<byte[]> inboundData = new LinkedBlockingDeque<>();
+	private final EquitiesMessageQueue data = new EquitiesMessageQueue();
+	private final Object fragmentLock = new Object();
+	private final ByteArrayOutputStream fragments = new ByteArrayOutputStream();
+	private final AtomicLong dataMsgCount = new AtomicLong(0L);
+	private final AtomicLong textMsgCount = new AtomicLong(0L);
+	private final ClientConnectionManager connection;
+	private final int connectTimeoutMs;
+
 	private Config config;
-	private AtomicReference<Token> token = new AtomicReference<Token>(new Token(null, LocalDateTime.now()));
-	private AtomicLong dataMsgCount = new AtomicLong(0l);
-	private AtomicLong textMsgCount = new AtomicLong(0l);
-	private OnTrade onTrade = (Trade trade) -> {};
-	private OnQuote onQuote = (Quote quote) -> {};
-	private Thread[] processDataThreads;
-	private boolean isCancellationRequested = false;
-	private String HeaderClientInformationKey = "Client-Information";
-	private String HeaderClientInformationValue = "IntrinioRealtimeJavaSDKv9.0";
-	private String HeaderMessageVersionKey = "UseNewEquitiesFormat";
-	private String HeaderMessageVersionValue = "v2";
-	//endregion Data Members
+	private OnTrade onTrade = trade -> {};
+	private OnQuote onQuote = quote -> {};
+	private volatile boolean processing;
+	private volatile long processingGeneration;
+	private volatile Thread[] processDataThreads = new Thread[0];
+	private volatile Thread prioritizeThread;
+	private volatile HttpURLConnection authConnection;
 
-	//region Constructors
 	public Client() {
-		try {
-			config = Config.load();
-			processDataThreads = new Thread[config.getEquitiesNumThreads()];
-		} catch (Exception e) {
-			Client.Log("Initialization Failure. " + e.getMessage());
-		}
+		this(Config.load());
 	}
 
 	public Client(Config config) {
-		try {
-			this.config = config;
-			processDataThreads = new Thread[config.getEquitiesNumThreads()];
-		} catch (Exception e) {
-			Client.Log("Initialization Failure. " + e.getMessage());
-		}
+		this(config, null, null, SELF_HEAL_BACKOFFS, CONNECT_TIMEOUT_MS);
 	}
 
-	public Client(OnTrade onTrade){
-		this();
-		this.onTrade = onTrade;
-	}
-
-	public Client(OnTrade onTrade, OnQuote onQuote){
-		this();
-		this.onTrade = onTrade;
-		this.onQuote = onQuote;
-	}
-
-	public Client(OnTrade onTrade, Config config){
-		this(config);
-		this.onTrade = onTrade;
-	}
-
-	public Client(OnTrade onTrade, OnQuote onQuote, Config config){
-		this(config);
-		this.onTrade = onTrade;
-		this.onQuote = onQuote;
-	}
-
-	protected void finalize() {
-		try { this.stop(); } catch (Exception e){}
-	}
-	//endregion Constructors
-
-	//region Public Get Set
-	public String getStats() {
-		return String.format("Data Messages = %d, Text Messages = %d, Queue Depth = %d", this.dataMsgCount.get(), this.textMsgCount.get(), getDataSize());
-	}
-	//endregion Public Get Set
-
-	//region Private Get Set
-	private int getDataSize() {
-		return dataBucket.size();
-	}
-
-	private String getAuthUrl() throws Exception {
-		String authUrl;
-		switch (config.getEquitiesProvider()) {
-			case REALTIME: authUrl = "https://realtime-mx.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
-				break;
-			case IEX: authUrl = "https://realtime-mx.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
-				break;
-			case DELAYED_SIP: authUrl = "https://realtime-delayed-sip.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
-				break;
-			case NASDAQ_BASIC: authUrl = "https://realtime-nasdaq-basic.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
-				break;
-			case CBOE_ONE: authUrl = "https://cboe-one.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
-				break;
-			case EQUITIES_EDGE: authUrl = "https://equities-edge.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
-				break;
-			case MANUAL: authUrl = "http://" + config.getEquitiesIpAddress() + "/auth?api_key=" + config.getEquitiesApiKey();
-				break;
-			default: throw new Exception("Provider not specified!");
-		}
-		return authUrl;
-	}
-
-	private String getWebSocketUrl (String token) throws Exception {
-		String wsUrl;
-		String delayedPart = config.isEquitiesDelayed() ? "&delayed=true" : "";
-		switch (config.getEquitiesProvider()) {
-			case REALTIME: wsUrl = "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
-				break;
-			case IEX: wsUrl = "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
-				break;
-			case DELAYED_SIP: wsUrl = "wss://realtime-delayed-sip.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
-				break;
-			case NASDAQ_BASIC: wsUrl = "wss://realtime-nasdaq-basic.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
-				break;
-			case CBOE_ONE: wsUrl = "wss://cboe-one.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
-				break;
-			case EQUITIES_EDGE: wsUrl = "wss://equities-edge.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
-				break;
-			case MANUAL: wsUrl = "ws://" + config.getEquitiesIpAddress() + "/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
-				break;
-			default: throw new Exception("Provider not specified!");
-		}
-		return wsUrl;
-	}
-
-	private boolean allReady() {
-		wsLock.readLock().lock();
-		try {
-			return wsState.isReady();
-		} finally {
-			wsLock.readLock().unlock();
-		}
-	}
-	//endregion Private Get Set
-
-	//region Public Methods
-	public CompletionStage<Void> onClose(WebSocket ws, int status, String reason) {
-		wsLock.writeLock().lock();
-		try {
-			try {
-				this.wsState.getWebSocket().sendClose(1000, "Client closed");
-			}catch (Exception ex){}
-
-			if (!wsState.isReconnecting()) {
-				Client.Log("Websocket - Closed");
-				wsState.setReady(false);
-				if (!isCancellationRequested){
-					this.wsState.setReconnecting(true);
-					try {
-						new Thread(() -> {
-							try { Thread.sleep(1000); } catch (Exception e){}
-							this.runReconnectLoop();
-						}).start();
-					}catch (Exception e){}
+	Client(
+		Config config,
+		ClientConnectionManager.TokenFetcher tokenFetcher,
+		ClientConnectionManager.SocketConnector socketConnector,
+		long[] backoffs,
+		int connectTimeoutMs) {
+		this.config = config;
+		this.connectTimeoutMs = connectTimeoutMs;
+		this.connection = new ClientConnectionManager(
+			tokenFetcher == null ? this::tryGetNewToken : tokenFetcher,
+			token -> new URI(getWebSocketUrl(token)),
+			socketConnector == null ? this::connectWebSocket : socketConnector,
+			new ClientConnectionManager.Callbacks() {
+				@Override public void onSessionStarting() { startThreads(); }
+				@Override public void onSessionStopping() { stopThreads(); }
+				@Override public void onDisconnected() { clearFragments(); }
+				@Override public void onConnected(WebSocket webSocket) throws Exception { rejoinChannels(webSocket); }
+				@Override public void onBinary(WebSocket webSocket, ByteBuffer bytes, boolean isComplete) {
+					handleBinary(bytes, isComplete);
 				}
-			}
-		} finally {
-			wsLock.writeLock().unlock();
-		}
-		return null;
+				@Override public void onText(WebSocket webSocket, CharSequence text, boolean isComplete) {
+					handleText(text);
+				}
+				@Override public void log(String message, Object... args) { Client.Log(message, args); }
+			},
+			backoffs,
+			connectTimeoutMs);
 	}
 
-	public void onError(WebSocket ws, Throwable err) {
-		try {
-			Client.Log("Websocket - Error - %s", err.getMessage());
-			ws.request(1);
-			if (err.getMessage() == "Operation timed out"){
-				onClose(ws, 1000, "Websocket - Error");
-			}
-		}
-		catch (Exception e){
-			Client.Log("Websocket - Error - %s", e.getMessage());
-		}
+	Client(
+		OnTrade onTrade,
+		OnQuote onQuote,
+		Config config,
+		ClientConnectionManager.TokenFetcher tokenFetcher,
+		ClientConnectionManager.SocketConnector socketConnector,
+		long[] backoffs,
+		int connectTimeoutMs) {
+		this(config, tokenFetcher, socketConnector, backoffs, connectTimeoutMs);
+		this.onTrade = onTrade;
+		this.onQuote = onQuote;
 	}
 
-	public CompletionStage<Void> onText(WebSocket ws, CharSequence data, boolean isComplete) {
-		textMsgCount.addAndGet(1l);
-		if (data != null && data.length() > 0) {
-			try {
-				Client.Log("Error received: %s", data.toString());
-				ws.request(1);
-			}
-			catch (Exception e) {
-				Client.Log("Failure parsing error from server in onText(). " + e.getMessage());
-				ws.request(1);
-			}
-		}
-		else
-			ws.request(1);
-		return null;
+	public Client(OnTrade onTrade) {
+		this();
+		this.onTrade = onTrade;
 	}
 
-	public CompletionStage<Void> onBinary(WebSocket ws, ByteBuffer data, boolean isComplete) {
-		dataMsgCount.addAndGet(1);
-		byte[] bytes = new byte[data.remaining()];
-		data.get(bytes);
-		this.dataBucket.add(new Tuple<byte[], Boolean>(bytes, isComplete));
-		if (isComplete) {
-			this.data.add(assembleCompleteDataMessage());
-		}
-		ws.request(1);
-		return null;
+	public Client(OnTrade onTrade, OnQuote onQuote) {
+		this();
+		this.onTrade = onTrade;
+		this.onQuote = onQuote;
+	}
+
+	public Client(OnTrade onTrade, Config config) {
+		this(config);
+		this.onTrade = onTrade;
+	}
+
+	public Client(OnTrade onTrade, OnQuote onQuote, Config config) {
+		this(config);
+		this.onTrade = onTrade;
+		this.onQuote = onQuote;
+	}
+
+	@Override
+	protected void finalize() {
+		try { this.stop(); } catch (Exception ignored) {}
+	}
+
+	public String getStats() {
+		return String.format("Data Messages = %d, Text Messages = %d, Queue Depth = %d",
+			dataMsgCount.get(), textMsgCount.get(), inboundData.size() + data.size());
+	}
+
+	@Override
+	public CompletionStage<Void> onClose(WebSocket webSocket, int status, String reason) {
+		return connection.onClose(webSocket, status, reason);
+	}
+
+	@Override
+	public void onError(WebSocket webSocket, Throwable error) {
+		connection.onError(webSocket, error);
+	}
+
+	@Override
+	public CompletionStage<Void> onText(WebSocket webSocket, CharSequence text, boolean isComplete) {
+		if (connection.isCurrent(webSocket)) handleText(text);
+		if (connection.isCurrent(webSocket)) webSocket.request(1);
+		return CompletableFuture.completedFuture(null);
+	}
+
+	@Override
+	public CompletionStage<Void> onBinary(WebSocket webSocket, ByteBuffer bytes, boolean isComplete) {
+		if (connection.isCurrent(webSocket)) handleBinary(bytes, isComplete);
+		if (connection.isCurrent(webSocket)) webSocket.request(1);
+		return CompletableFuture.completedFuture(null);
 	}
 
 	public static void Log(String message) {
@@ -250,502 +164,312 @@ public class Client implements WebSocket.Listener {
 	}
 
 	public void join() {
-		while (!this.allReady()) {
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {}
-		}
+		connection.awaitReady();
 		String[] symbols = config.getEquitiesSymbols();
+		if (symbols == null) return;
 		boolean tradesOnly = config.isEquitiesTradesOnly();
-		for (String symbol : symbols) {
-			if (!this.channels.contains(new Channel(symbol, tradesOnly))) {
-				this._join(symbol, tradesOnly);
-			}
-		}
+		for (String symbol : symbols) _join(symbol, tradesOnly);
 	}
 
 	public void join(String symbol, boolean tradesOnly) {
-		boolean t = tradesOnly || config.isEquitiesTradesOnly();
-		while (!this.allReady()) {
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {}
-		}
-		if (!this.channels.contains(new Channel(symbol, tradesOnly))) {
-			this._join(symbol, t);
-		}
+		connection.awaitReady();
+		_join(symbol, tradesOnly || config.isEquitiesTradesOnly());
 	}
 
 	public void join(String symbol) {
-		this.join(symbol, false);
+		join(symbol, false);
 	}
 
 	public void join(String[] symbols, boolean tradesOnly) {
-		boolean t = tradesOnly || config.isEquitiesTradesOnly();
-		while (!this.allReady()) {
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {}
-		}
-		for (String symbol : symbols) {
-			if (!this.channels.contains(new Channel(symbol, t))) {
-				this._join(symbol, t);
-			}
-		}
+		connection.awaitReady();
+		boolean effectiveTradesOnly = tradesOnly || config.isEquitiesTradesOnly();
+		for (String symbol : symbols) _join(symbol, effectiveTradesOnly);
 	}
 
 	public void join(String[] symbols) {
-		this.join(symbols, false);
+		join(symbols, false);
 	}
 
-	public void joinLobby(){
+	public void joinLobby() {
 		joinLobby(false);
 	}
 
-	public void joinLobby(boolean tradesOnly){
-		boolean t = tradesOnly || config.isEquitiesTradesOnly();
-		while (!this.allReady()) {
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {}
-		}
-		if (!this.channels.contains(new Channel(FirehoseChannelName, tradesOnly))) {
-			this._join(FirehoseChannelName, t);
-		}
+	public void joinLobby(boolean tradesOnly) {
+		connection.awaitReady();
+		_join(FIREHOSE_CHANNEL_NAME, tradesOnly || config.isEquitiesTradesOnly());
 	}
 
 	public void leave() {
-		for (Channel channel : this.channels) {
-			this._leave(channel.symbol(), channel.tradesOnly());
-		}
+		for (Channel channel : Set.copyOf(channels)) _leave(channel.symbol(), channel.tradesOnly());
 	}
 
 	public void leave(String symbol) {
-		for (Channel channel : this.channels) {
-			if (channel.symbol() == symbol) {
-				this._leave(symbol, channel.tradesOnly());
-			}
+		for (Channel channel : Set.copyOf(channels)) {
+			if (channel.symbol().equals(symbol)) _leave(symbol, channel.tradesOnly());
 		}
 	}
 
-	public void leaveLobby(){
-		for (Channel channel : this.channels) {
-			if (channel.symbol() == FirehoseChannelName) {
-				this._leave(FirehoseChannelName, channel.tradesOnly());
-			}
-		}
+	public void leaveLobby() {
+		leave(FIREHOSE_CHANNEL_NAME);
 	}
 
 	public void leave(String[] symbols) {
-		for (String symbol : symbols) {
-			for (Channel channel : this.channels) {
-				if (channel.symbol() == symbol) {
-					this._leave(symbol, channel.tradesOnly());
-				}
-			}
-		}
+		for (String symbol : symbols) leave(symbol);
 	}
 
-	public void start() throws Exception{
-		String token = this.fetchToken();
-		this.initializeWebSocket(token);
-		this.startThreads();
+	public void start() throws Exception {
+		connection.start();
 	}
 
 	public void stop() {
-		this.leave();
-		try {
-			Thread.sleep(1000);
-		} catch (Exception e) {}
-		wsLock.writeLock().lock();
-		try {
-			wsState.setReady(false);
-		} catch (Exception e) {}
-		finally {
-			wsLock.writeLock().unlock();
-		}
-		Client.Log("Websocket - Closing");
-		stopThreads(); //this sets isCancellationRequested = true so the following close event doesn't try to reconnect
-		onClose(this.wsState.getWebSocket(), 1000, "Websocket - Error");
-		Client.Log("Stopped");
+		Log("Websocket - Closing");
+		connection.stop();
+		Log("Stopped");
 	}
-	//endregion Public Methods
 
-	//region Private Methods
-	private void processData(){
-		while (!this.isCancellationRequested) {
-			int count, offset, messageLength;
-			byte type;
-			ByteBuffer buffer, offsetBuffer;
+	private String getAuthUrl() throws Exception {
+		switch (config.getEquitiesProvider()) {
+			case REALTIME:
+			case IEX:
+				return "https://realtime-mx.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
+			case DELAYED_SIP:
+				return "https://realtime-delayed-sip.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
+			case NASDAQ_BASIC:
+				return "https://realtime-nasdaq-basic.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
+			case CBOE_ONE:
+				return "https://cboe-one.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
+			case EQUITIES_EDGE:
+				return "https://equities-edge.intrinio.com/auth?api_key=" + config.getEquitiesApiKey();
+			case MANUAL:
+				return "http://" + config.getEquitiesIpAddress() + "/auth?api_key=" + config.getEquitiesApiKey();
+			default:
+				throw new Exception("Provider not specified!");
+		}
+	}
+
+	private String getWebSocketUrl(String token) throws Exception {
+		String delayedPart = config.isEquitiesDelayed() ? "&delayed=true" : "";
+		switch (config.getEquitiesProvider()) {
+			case REALTIME:
+			case IEX:
+				return "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
+			case DELAYED_SIP:
+				return "wss://realtime-delayed-sip.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
+			case NASDAQ_BASIC:
+				return "wss://realtime-nasdaq-basic.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
+			case CBOE_ONE:
+				return "wss://cboe-one.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
+			case EQUITIES_EDGE:
+				return "wss://equities-edge.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
+			case MANUAL:
+				return "ws://" + config.getEquitiesIpAddress() + "/socket/websocket?vsn=1.0.0&token=" + token + delayedPart;
+			default:
+				throw new Exception("Provider not specified!");
+		}
+	}
+
+	private CompletableFuture<WebSocket> connectWebSocket(URI uri, WebSocket.Listener listener) {
+		HttpClient httpClient = HttpClient.newBuilder()
+			.connectTimeout(Duration.ofMillis(connectTimeoutMs))
+			.build();
+		return httpClient.newWebSocketBuilder()
+			.connectTimeout(Duration.ofMillis(connectTimeoutMs))
+			.header(HEADER_MESSAGE_VERSION_KEY, HEADER_MESSAGE_VERSION_VALUE)
+			.header(HEADER_CLIENT_INFORMATION_KEY, HEADER_CLIENT_INFORMATION_VALUE)
+			.buildAsync(uri, listener);
+	}
+
+	private String tryGetNewToken() {
+		HttpURLConnection connection = null;
+		try {
+			URL url = new URI(getAuthUrl()).toURL();
+			connection = (HttpURLConnection) url.openConnection();
+			authConnection = connection;
+			connection.setConnectTimeout(connectTimeoutMs);
+			connection.setReadTimeout(connectTimeoutMs);
+			connection.setRequestProperty(HEADER_CLIENT_INFORMATION_KEY, HEADER_CLIENT_INFORMATION_VALUE);
+			connection.setRequestMethod("GET");
+			int status = connection.getResponseCode();
+			if (status != 200) {
+				Log("Authorization Failure (%d). The authorization key you provided is likely incorrect.", status);
+				return null;
+			}
+			try (BufferedReader reader = new BufferedReader(
+				new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+				String token = reader.readLine();
+				Log("Authorization successful");
+				return token;
+			}
+		} catch (Exception exception) {
+			Log("Authorization Failure. %s", exception.getMessage());
+			return null;
+		} finally {
+			if (authConnection == connection) authConnection = null;
+			if (connection != null) connection.disconnect();
+		}
+	}
+
+	private void handleText(CharSequence text) {
+		textMsgCount.incrementAndGet();
+		if (text != null && text.length() > 0) Log("Error received: %s", text.toString());
+	}
+
+	private void handleBinary(ByteBuffer source, boolean isComplete) {
+		dataMsgCount.incrementAndGet();
+		byte[] bytes = new byte[source.remaining()];
+		source.get(bytes);
+		byte[] complete = null;
+		synchronized (fragmentLock) {
+			if (isComplete && fragments.size() == 0) {
+				complete = bytes;
+			} else {
+				fragments.write(bytes, 0, bytes.length);
+			}
+			if (isComplete && complete == null) {
+				complete = fragments.toByteArray();
+				fragments.reset();
+			}
+		}
+		if (complete != null) inboundData.addLast(complete);
+	}
+
+	private void clearFragments() {
+		synchronized (fragmentLock) { fragments.reset(); }
+	}
+
+	private void prioritizeData(long session) {
+		while (processing && processingGeneration == session) {
 			try {
-				byte[] datum = data.poll(1, TimeUnit.SECONDS);
-				if (datum != null) {
-					count = datum[0];
-					offset = 1;
-					buffer = ByteBuffer.wrap(datum);
-					buffer.position(0);
-					buffer.limit(datum.length);
-					for (long i = 0L; i < count; i++) {
-						buffer.position(0);
-						type = datum[offset];
-						messageLength = datum[offset + 1];
-						offsetBuffer = buffer.slice(offset, messageLength);
-						switch (type) {
-							case 0:
-								Trade trade = Trade.parse(offsetBuffer);
-								onTrade.onTrade(trade);
-								break;
-							case 1:
-							case 2:
-								Quote quote = Quote.parse(offsetBuffer);
-								onQuote.onQuote(quote);
-								break;
-							default:
-								Client.Log("Error parsing multi-part message. Type is %d", type);
-								i = count;
-						}
-						offset += messageLength;
-					}
-				}
-			} catch (Exception ex)
-			{
-				Client.Log("General Exception");
+				byte[] batch = inboundData.pollFirst(250, TimeUnit.MILLISECONDS);
+				if (batch != null && processingGeneration == session) data.enqueueBatch(batch);
+			} catch (InterruptedException exception) {
+				if (!processing || processingGeneration != session) return;
+			} catch (Exception exception) {
+				Log("Error prioritizing equities message: %s", exception.getMessage());
 			}
 		}
 	}
 
-	private void startThreads() throws Exception{
-		this.isCancellationRequested = false;
-		for (int i = 0; i < processDataThreads.length; i++) {
-			processDataThreads[i] = new Thread(()->processData());
+	private void processData(long session) {
+		while (processing && processingGeneration == session) {
+			try {
+				ByteBuffer message = data.poll(250, TimeUnit.MILLISECONDS);
+				if (message == null || processingGeneration != session) continue;
+				switch (message.get(0)) {
+					case 0:
+						onTrade.onTrade(Trade.parse(message));
+						break;
+					case 1:
+					case 2:
+						onQuote.onQuote(Quote.parse(message));
+						break;
+					default:
+						Log("Error parsing message. Type is %d", message.get(0));
+				}
+			} catch (InterruptedException exception) {
+				if (!processing) return;
+			} catch (Exception exception) {
+				Log("Error processing equities message: %s", exception.getMessage());
+			}
 		}
-		for (Thread thread : processDataThreads) {
+	}
+
+	private void startThreads() {
+		inboundData.clear();
+		data.clear();
+		clearFragments();
+		dataMsgCount.set(0L);
+		textMsgCount.set(0L);
+		processing = true;
+		long session = ++processingGeneration;
+		prioritizeThread = new Thread(() -> prioritizeData(session), "intrinio-equities-prioritizer");
+		prioritizeThread.setDaemon(true);
+		prioritizeThread.start();
+		int threadCount = config == null ? 1 : Math.max(config.getEquitiesNumThreads(), 1);
+		processDataThreads = new Thread[threadCount];
+		for (int i = 0; i < processDataThreads.length; i++) {
+			Thread thread = new Thread(() -> processData(session), "intrinio-equities-processor-" + i);
+			thread.setDaemon(true);
+			processDataThreads[i] = thread;
 			thread.start();
 		}
 	}
 
-	private void stopThreads(){
-		this.isCancellationRequested = true;
-		try {
-			Thread.sleep(1000);
-		}catch (Exception e){}
-		for (Thread thread : processDataThreads) {
-			try {
-				thread.join();
-			}catch (Exception e){}
+	private void stopThreads() {
+		HttpURLConnection activeAuth = authConnection;
+		if (activeAuth != null) activeAuth.disconnect();
+		processing = false;
+		processingGeneration++;
+		Thread prioritizer = prioritizeThread;
+		if (prioritizer != null) prioritizer.interrupt();
+		Thread[] threads = processDataThreads;
+		for (Thread thread : threads) if (thread != null) thread.interrupt();
+		for (Thread thread : threads) {
+			if (thread == null || thread == Thread.currentThread()) continue;
+			try { thread.join(THREAD_JOIN_TIMEOUT_MS); }
+			catch (InterruptedException exception) { Thread.currentThread().interrupt(); break; }
 		}
+		if (prioritizer != null && prioritizer != Thread.currentThread()) {
+			try { prioritizer.join(THREAD_JOIN_TIMEOUT_MS); }
+			catch (InterruptedException exception) { Thread.currentThread().interrupt(); }
+		}
+		inboundData.clear();
+		data.clear();
+		clearFragments();
 	}
 
 	private void _join(String symbol, boolean tradesOnly) {
-		_join(symbol, tradesOnly, false);
-	}
-
-	private void _join(String symbol, boolean tradesOnly, boolean forceRejoin){
+		if (symbol == null || symbol.isBlank()) return;
 		Channel channel = new Channel(symbol, tradesOnly);
-		if (channels.add(channel) || (channels.contains(channel) && forceRejoin)) {
-			byte[] message = makeJoinMessage(tradesOnly, symbol);
-			Client.Log("Websocket - Joining channel: %s (trades only = %s)", symbol, Boolean.toString(tradesOnly));
-			wsState.getWebSocket().sendBinary(ByteBuffer.wrap(message), true);
+		if (!channels.add(channel)) return;
+		try {
+			sendJoin(connection.currentSocket(), channel, false);
+		} catch (Exception exception) {
+			channels.remove(channel);
+			Log("Websocket - Failed joining channel %s: %s", symbol, exception.getMessage());
 		}
 	}
 
 	private void _leave(String symbol, boolean tradesOnly) {
 		Channel channel = new Channel(symbol, tradesOnly);
-		if (channels.remove(channel)) {
-			byte[] message = makeLeaveMessage(symbol);
-			Client.Log("Websocket - Leaving channel: %s (trades only = %s)", symbol, Boolean.toString(tradesOnly));
-			wsState.getWebSocket().sendBinary(ByteBuffer.wrap(message), true);
-		}
+		if (!channels.remove(channel)) return;
+		WebSocket webSocket = connection.currentSocket();
+		if (webSocket == null) return;
+		Log("Websocket - Leaving channel: %s (trades only = %s)", symbol, Boolean.toString(tradesOnly));
+		webSocket.sendBinary(ByteBuffer.wrap(makeLeaveMessage(symbol)), true);
 	}
 
-	private void onWebSocketConnected (WebSocket ws, WebSocketState wsState) {
-		for (Channel channel : channels) {
-			_join(channel.symbol(), channel.tradesOnly(), true);
-		}
+	private void rejoinChannels(WebSocket webSocket) throws Exception {
+		for (Channel channel : Set.copyOf(channels)) sendJoin(webSocket, channel, true);
 	}
 
-	private void abortWebSocket(WebSocket ws) {
-		if (ws == null) {
-			return;
-		}
-		try {
-			ws.abort();
-		} catch (Exception e) {}
-	}
-
-	private void abortConnectAttempt(CompletableFuture<WebSocket> task) {
-		if (task == null) {
-			return;
-		}
-		task.cancel(true);
-		task.whenComplete((ws, err) -> abortWebSocket(ws));
-	}
-
-	private void runReconnectLoop() {
-		while (!isCancellationRequested) {
-			try {
-				this.doWithRetryBackoff(() -> reconnect());
-				return;
-			} catch (Exception e) {
-				Client.Log("Websocket - Reconnect loop ended unexpectedly: %s", e.getMessage());
-				wsLock.writeLock().lock();
-				try {
-					this.wsState.setReconnecting(false);
-				} finally {
-					wsLock.writeLock().unlock();
-				}
-				if (isCancellationRequested) {
-					return;
-				}
-				try {
-					Thread.sleep(this.selfHealBackoffs[0]);
-				} catch (Exception ignored) {
-					return;
-				}
-			}
-		}
-	}
-
-	private void initializeWebSocket(String token) {
-		Client.Log("Websocket - Connecting...");
-		String wsUrl;
-		try {
-			wsUrl = this.getWebSocketUrl(token);
-		} catch (Exception e) {
-			Client.Log("Initialization Failure. " + e.getMessage());
-			return;
-		}
-		URI uri;
-		try {
-			uri = new URI(wsUrl);
-		} catch (URISyntaxException e) {
-			Client.Log("Initialization Failure. Bad URL (%s). %s", wsUrl, e.getMessage());
-			return;
-		}
-
-		WebSocket previous;
-		CompletableFuture<WebSocket> task;
-		wsLock.writeLock().lock();
-		try {
-			previous = this.wsState.getWebSocket();
-			HttpClient httpClient = HttpClient.newBuilder()
-				.connectTimeout(Duration.ofMillis(this.connectTimeoutMs))
-				.build();
-			task = httpClient.newWebSocketBuilder()
-				.header(HeaderMessageVersionKey, HeaderMessageVersionValue)
-				.header(HeaderClientInformationKey, HeaderClientInformationValue)
-				.buildAsync(uri, (WebSocket.Listener) this);
-		} finally {
-			wsLock.writeLock().unlock();
-		}
-
-		abortWebSocket(previous);
-
-		try {
-			WebSocket ws = task.get(this.connectTimeoutMs, TimeUnit.MILLISECONDS);
-			wsLock.writeLock().lock();
-			try {
-				this.wsState.setWebSocket(ws);
-			} finally {
-				wsLock.writeLock().unlock();
-			}
-			Client.Log("Websocket - Connected");
-			this.onWebSocketConnected(ws, this.wsState);
-		} catch (TimeoutException e) {
-			Client.Log("Initialization Failure. Connection timed out after %d ms.", this.connectTimeoutMs);
-			abortConnectAttempt(task);
-		} catch (ExecutionException e) {
-			Client.Log("Initialization Failure. Could not establish connection. %s", e.getMessage());
-			abortConnectAttempt(task);
-		} catch (InterruptedException e) {
-			Client.Log("Initialization Failure. Thread interrupted. %s", e.getMessage());
-			Thread.currentThread().interrupt();
-			abortConnectAttempt(task);
-		}
-	}
-
-	private boolean reconnect(){
-		Client.Log("Websocket - Reconnecting...");
-		if (this.wsState.isReady()) {
-			return true;
-		}
-		this.wsLock.writeLock().lock();
-		try {
-			this.wsState.setReconnecting(true);
-		} finally {
-			this.wsLock.writeLock().unlock();
-		}
-		try {
-			String token = this.fetchToken();
-			initializeWebSocket(token);
-			return this.wsState.isReady();
-		} catch (Exception e) {
-			Client.Log("Websocket - Reconnect attempt failed: %s", e.getMessage());
-			return false;
-		}
-	}
-
-	private String fetchToken() {
-		tLock.readLock().lock();
-		try {
-			tLock.readLock().unlock();
-			tLock.writeLock().lock();
-			try {
-				doWithRetryBackoff(() -> tryGetNewToken());
-				tLock.readLock().lock();
-				return this.token.get().token();
-			} finally {
-				tLock.writeLock().unlock();
-			}
-		} finally {
-			tLock.readLock().unlock();
-		}
-	}
-
-	private boolean tryGetNewToken(){
-		Client.Log("Authorizing...");
-		String authUrl = null;
-		try {
-			authUrl = this.getAuthUrl();
-		} catch (Exception e) {
-			Client.Log("Authorization Failure. " + e.getMessage());
-			return false;
-		}
-		URL url = null;
-		try {
-			url = new URL(authUrl);
-		} catch (MalformedURLException e) {
-			Client.Log("Authorization Failure. Bad URL (%s). %s", authUrl, e.getMessage());
-			return false;
-		}
-		HttpURLConnection con;
-		try {
-			con = (HttpURLConnection) url.openConnection();
-			con.setRequestProperty(HeaderClientInformationKey, HeaderClientInformationValue);
-		} catch (IOException e) {
-			Client.Log("Authorization Failure. Please check your network connection. " + e.getMessage());
-			return false;
-		}
-		try {
-			con.setRequestMethod("GET");
-			int status = con.getResponseCode();
-			if (status == 200) {
-				BufferedReader reader = new BufferedReader(new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8));
-				String token = reader.readLine();
-				this.token.set(new Token(token, LocalDateTime.now()));
-				Client.Log("Authorization successful");
-				return true;
-			}
-			else
-				Client.Log("Authorization Failure (%d). The authorization key you provided is likely incorrect.", status);
-			return false;
-		} catch (ProtocolException e) {
-			Client.Log("Authorization Failure. Bad request type. " + e.getMessage());
-			return false;
-		} catch (IOException e) {
-			Client.Log("Authorization Failure. The authorization server is likely offline. " + e.getMessage());
-			return false;
-		} catch (Exception e) {
-			Client.Log("Authorization Failure. " + e.getMessage());
-			return false;
-		}
+	private void sendJoin(WebSocket webSocket, Channel channel, boolean waitForSend) throws Exception {
+		if (webSocket == null) throw new IOException("Websocket is not connected");
+		Log("Websocket - Joining channel: %s (trades only = %s)",
+			channel.symbol(), Boolean.toString(channel.tradesOnly()));
+		CompletableFuture<WebSocket> send = webSocket.sendBinary(
+			ByteBuffer.wrap(makeJoinMessage(channel.tradesOnly(), channel.symbol())), true);
+		if (waitForSend) send.get(connectTimeoutMs, TimeUnit.MILLISECONDS);
 	}
 
 	private byte[] makeJoinMessage(boolean tradesOnly, String symbol) {
-		byte[] message, symbolBytes;
-		switch (symbol) {
-			case "lobby":
-				message = new byte[11];
-				symbolBytes = "$FIREHOSE".getBytes(StandardCharsets.US_ASCII);
-				break;
-			default:
-				message = new byte[(2 + symbol.length())];
-				symbolBytes = symbol.getBytes(StandardCharsets.US_ASCII);
-				break;
-		}
-		message[0] = (byte)74; //type: join (74) or leave (76)
-		message[1] = tradesOnly ? (byte)1 : (byte)0;
+		byte[] symbolBytes = FIREHOSE_CHANNEL_NAME.equals(symbol)
+			? "$FIREHOSE".getBytes(StandardCharsets.US_ASCII)
+			: symbol.getBytes(StandardCharsets.US_ASCII);
+		byte[] message = new byte[2 + symbolBytes.length];
+		message[0] = (byte) 74;
+		message[1] = tradesOnly ? (byte) 1 : (byte) 0;
 		System.arraycopy(symbolBytes, 0, message, 2, symbolBytes.length);
 		return message;
 	}
 
 	private byte[] makeLeaveMessage(String symbol) {
-		byte[] message, symbolBytes;
-		switch (symbol) {
-			case "lobby":
-				message = new byte[10];
-				symbolBytes = "$FIREHOSE".getBytes(StandardCharsets.US_ASCII);
-				break;
-			default:
-				message = new byte[(1 + symbol.length())];
-				symbolBytes = symbol.getBytes(StandardCharsets.US_ASCII);
-				break;
-		}
-		message[0] = (byte)76; //type: join (74) or leave (76)
+		byte[] symbolBytes = FIREHOSE_CHANNEL_NAME.equals(symbol)
+			? "$FIREHOSE".getBytes(StandardCharsets.US_ASCII)
+			: symbol.getBytes(StandardCharsets.US_ASCII);
+		byte[] message = new byte[1 + symbolBytes.length];
+		message[0] = (byte) 76;
 		System.arraycopy(symbolBytes, 0, message, 1, symbolBytes.length);
 		return message;
-	}
-
-	private byte[] assembleCompleteDataMessage() {
-		Queue<byte[]> parts = new LinkedList<>();
-		int length = 0;
-		boolean done = false;
-		dataBucketLock.lock();
-		try {
-			while (!done) {
-				try {
-					Tuple<byte[], Boolean> datum = dataBucket.poll(1, TimeUnit.SECONDS);
-					if (datum != null) {
-						parts.add(datum.x);
-						done = datum.y;
-						length += datum.x.length;
-					}
-				} catch(InterruptedException e) {
-					Client.Log("process data interrupted");
-				}
-			}
-		} finally {dataBucketLock.unlock();}
-
-		//reassemble into one byte array
-		byte[] bytes = new byte[length];
-		int index = 0;
-		while (!parts.isEmpty()) {
-			byte[] part = parts.remove();
-			java.lang.System.arraycopy(part, 0, bytes, index, part.length);
-			index += part.length;
-		}
-		return bytes;
-	}
-
-	private void doWithRetryBackoff(BooleanSupplier callback) {
-		int i = 0;
-		while (!this.isCancellationRequested) {
-			try {
-				if (callback.getAsBoolean()) {
-					return;
-				}
-			} catch (Exception e) {
-				Client.Log("Websocket - Attempt failed: %s", e.getMessage());
-			}
-			if (this.isCancellationRequested) {
-				return;
-			}
-			try {
-				Thread.sleep(this.selfHealBackoffs[i]);
-			} catch (InterruptedException e) {
-				return;
-			}
-			i = Math.min(i + 1, this.selfHealBackoffs.length - 1);
-		}
-	}
-	//endregion Private Methods
-
-	private class Tuple<X, Y> {
-		  public final X x; 
-		  public final Y y; 
-		  public Tuple(X x, Y y) { 
-		    this.x = x; 
-		    this.y = y; 
-		  } 
 	}
 }

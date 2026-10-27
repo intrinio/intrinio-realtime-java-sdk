@@ -45,7 +45,7 @@ public class Client implements WebSocket.Listener {
 	private final Lock dataBucketLock = new ReentrantLock();
 	private final LinkedBlockingDeque<Tuple<byte[], Boolean>> dataBucket = new LinkedBlockingDeque<Tuple<byte[], Boolean>>();
 	private final WebSocketState wsState = new WebSocketState();
-	private final String Version = "IntrinioRealtimeOptionsJavaSDKv9.0";
+	private final String Version = "IntrinioRealtimeOptionsJavaSDKv9.1";
 	private final AtomicBoolean reconnectWorkerRunning = new AtomicBoolean(false);
 	private final AtomicLong connectionGeneration = new AtomicLong(0L);
 	private final Set<WebSocket> failedWebSockets = Collections.newSetFromMap(new ConcurrentHashMap<WebSocket, Boolean>());

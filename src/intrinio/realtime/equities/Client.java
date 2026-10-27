@@ -74,7 +74,7 @@ public class Client implements WebSocket.Listener {
 	private volatile HttpURLConnection activeAuthConnection;
 	private WebSocketConnector webSocketConnector = this::openWebSocket;
 	private static final String HeaderClientInformationKey = "Client-Information";
-	private static final String HeaderClientInformationValue = "IntrinioRealtimeJavaSDKv9.0";
+	private static final String HeaderClientInformationValue = "IntrinioRealtimeJavaSDKv9.1";
 	private static final String HeaderMessageVersionKey = "UseNewEquitiesFormat";
 	private static final String HeaderMessageVersionValue = "v2";
 

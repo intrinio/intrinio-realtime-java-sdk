@@ -35,8 +35,11 @@ final class PriorityMessageQueue {
 		try {
 			ArrayDeque<byte[]> queue = queues[priority];
 			if (priority == boundedQueue && queue.size() >= boundedQueueCapacity) {
+				// The displaced message already holds a permit. Do not release another.
+				queue.pollFirst();
 				droppedCount.incrementAndGet();
-				return false;
+				queue.addLast(message);
+				return true;
 			}
 			queue.addLast(message);
 			available.release();

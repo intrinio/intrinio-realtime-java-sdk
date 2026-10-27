@@ -184,36 +184,19 @@ public class Client implements WebSocket.Listener {
 
 	//region Public Methods
 	public CompletionStage<Void> onClose(WebSocket ws, int status, String reason) {
-		if (!isCurrentWebSocket(ws)) {
+		if (!noteFailedWebSocket(ws)) {
 			return CompletableFuture.completedFuture(null);
 		}
-		failedWebSockets.add(ws);
-		wsLock.writeLock().lock();
-		try {
-			Client.Log("Websocket - Closed%s", reason == null || reason.isBlank() ? "" : ". " + reason);
-			wsState.setReady(false);
-			wsState.setReconnecting(!isCancellationRequested);
-		} finally {
-			wsLock.writeLock().unlock();
-		}
+		Client.Log("Websocket - Closed%s", reason == null || reason.isBlank() ? "" : ". " + reason);
 		startReconnectWorker();
 		return CompletableFuture.completedFuture(null);
 	}
 
 	public void onError(WebSocket ws, Throwable err) {
 		Client.Log("Websocket - Error - %s", err == null ? "Unknown error" : err.getMessage());
-		if (isCurrentWebSocket(ws)) {
-			failedWebSockets.add(ws);
-			wsLock.writeLock().lock();
-			try {
-				wsState.setReady(false);
-				wsState.setReconnecting(!isCancellationRequested);
-			} finally {
-				wsLock.writeLock().unlock();
-			}
-			abortWebSocket(ws);
-			startReconnectWorker();
-		}
+		if (!noteFailedWebSocket(ws)) return;
+		abortWebSocket(ws);
+		startReconnectWorker();
 	}
 
 	public CompletionStage<Void> onText(WebSocket ws, CharSequence data, boolean isComplete) {
@@ -555,6 +538,7 @@ public class Client implements WebSocket.Listener {
 				wsState.setWebSocket(created);
 				wsState.setReady(false);
 				wsState.setReconnecting(true);
+				if (previous != null && previous != created) failedWebSockets.remove(previous);
 			} finally {
 				wsLock.writeLock().unlock();
 			}
@@ -727,17 +711,23 @@ public class Client implements WebSocket.Listener {
 	}
 
 	private void markDisconnectedAndReconnect(WebSocket ws) {
-		if (ws == null || !isCurrentWebSocket(ws)) return;
-		failedWebSockets.add(ws);
+		if (!noteFailedWebSocket(ws)) return;
+		abortWebSocket(ws);
+		startReconnectWorker();
+	}
+
+	private boolean noteFailedWebSocket(WebSocket ws) {
 		wsLock.writeLock().lock();
 		try {
+			if (ws == null || wsState.getWebSocket() != ws) return false;
+			failedWebSockets.add(ws);
+			failedWebSockets.removeIf(existing -> existing != ws);
 			wsState.setReady(false);
 			wsState.setReconnecting(!isCancellationRequested);
+			return true;
 		} finally {
 			wsLock.writeLock().unlock();
 		}
-		abortWebSocket(ws);
-		startReconnectWorker();
 	}
 
 	private boolean isCurrentWebSocket(WebSocket ws) {

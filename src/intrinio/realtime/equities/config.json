@@ -1,6 +1,6 @@
 {
-	"equitiesApiKey": "",
-	"equitiesProvider": "IEX",
+	"equitiesApiKey": "OmE5MDlmZTllZjI4ZjRjN2FkZWI1OTk0ODFlNjZhNmQ2",
+	"equitiesProvider": "DELAYED_SIP",
 	"equitiesSymbols": [ "GOOG", "MSFT", "AAPL" ],
 	"equitiesTradesOnly": false,
 	"equitiesNumThreads": 2,

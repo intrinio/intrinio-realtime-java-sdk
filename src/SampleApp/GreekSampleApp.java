@@ -189,7 +189,7 @@ public class GreekSampleApp {
         try {
             optionsClient.start();
             optionsClient.join();
-            // optionsClient.joinLobby(); // Firehose
+            //optionsClient.joinLobby(); // Firehose
             // optionsClient.join(new String[] { "AAPL", "GOOG", "MSFT" }); // Specify symbols at runtime
         } catch (Exception e) {
             Log("Error starting options client: " + e.getMessage());
@@ -220,7 +220,7 @@ public class GreekSampleApp {
         try {
             equitiesClient.start();
             equitiesClient.join();
-            // equitiesClient.joinLobby(); // Firehose
+            //equitiesClient.joinLobby(); // Firehose
             // equitiesClient.join(new String[] { "AAPL", "GOOG", "MSFT" }); // Specify symbols at runtime
         } catch (Exception e) {
             Log("Error starting equities client: " + e.getMessage());

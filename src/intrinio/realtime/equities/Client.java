@@ -13,48 +13,77 @@ import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.BooleanSupplier;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class Client implements WebSocket.Listener {
 	//region Final Data Members
-	private final String FirehoseChannelName = "lobby";
-	private final long[] selfHealBackoffs = {1000, 30000, 60000, 300000, 600000};
-	private final ReentrantReadWriteLock tLock = new ReentrantReadWriteLock();
+	private static final String FirehoseChannelName = "lobby";
+	private static final int QuoteQueueCapacity = 1_000_000;
+	private static final long DefaultConnectTimeoutMillis = 30_000L;
+	private static final long CloseTimeoutMillis = 5_000L;
+	private static final long ThreadJoinTimeoutMillis = 10_000L;
+	private long[] selfHealBackoffs = {1000, 30000, 60000, 300000, 600000};
+	private long connectTimeoutMillis = DefaultConnectTimeoutMillis;
 	private final ReentrantReadWriteLock wsLock = new ReentrantReadWriteLock();
-	private final LinkedBlockingDeque<byte[]> data = new LinkedBlockingDeque<>();
+	private final PriorityMessageQueue data = new PriorityMessageQueue(2, 1, QuoteQueueCapacity);
 	private final HashSet<Channel> channels = new HashSet<Channel>();
+	private final Object channelsLock = new Object();
+	private final Object lifecycleLock = new Object();
 	private final WebSocketState wsState = new WebSocketState();
 	private final LinkedBlockingDeque<Tuple<byte[], Boolean>> dataBucket = new LinkedBlockingDeque<Tuple<byte[], Boolean>>();
-	private final Lock dataBucketLock = new ReentrantLock();;
+	private final Lock dataBucketLock = new ReentrantLock();
+	private final AtomicBoolean reconnectWorkerRunning = new AtomicBoolean(false);
+	private final AtomicLong connectionGeneration = new AtomicLong(0L);
+	private final Set<WebSocket> failedWebSockets = Collections.newSetFromMap(new ConcurrentHashMap<WebSocket, Boolean>());
 	//endregion Final Data Members
 
 	//region Data Members
 	private Config config;
-	private AtomicReference<Token> token = new AtomicReference<Token>(new Token(null, LocalDateTime.now()));
-	private AtomicLong dataMsgCount = new AtomicLong(0l);
-	private AtomicLong textMsgCount = new AtomicLong(0l);
+	private final AtomicReference<Token> token = new AtomicReference<Token>(new Token(null, LocalDateTime.now()));
+	private final AtomicLong dataMsgCount = new AtomicLong(0L);
+	private final AtomicLong textMsgCount = new AtomicLong(0L);
 	private OnTrade onTrade = (Trade trade) -> {};
 	private OnQuote onQuote = (Quote quote) -> {};
 	private Thread[] processDataThreads;
-	private boolean isCancellationRequested = false;
-	private String HeaderClientInformationKey = "Client-Information";
-	private String HeaderClientInformationValue = "IntrinioRealtimeJavaSDKv9.0";
-	private String HeaderMessageVersionKey = "UseNewEquitiesFormat";
-	private String HeaderMessageVersionValue = "v2";
+	private volatile boolean isCancellationRequested = true;
+	private volatile Lifecycle lifecycle = Lifecycle.STOPPED;
+	private volatile Thread reconnectThread;
+	private volatile Thread connectingThread;
+	private volatile CompletableFuture<WebSocket> connectFuture;
+	private volatile HttpURLConnection activeAuthConnection;
+	private WebSocketConnector webSocketConnector = this::openWebSocket;
+	private static final String HeaderClientInformationKey = "Client-Information";
+	private static final String HeaderClientInformationValue = "IntrinioRealtimeJavaSDKv9.0";
+	private static final String HeaderMessageVersionKey = "UseNewEquitiesFormat";
+	private static final String HeaderMessageVersionValue = "v2";
+
+	private enum Lifecycle { STOPPED, STARTING, STARTED, STOPPING }
+
+	@FunctionalInterface
+	interface WebSocketConnector {
+		CompletableFuture<WebSocket> connect(URI uri, WebSocket.Listener listener);
+	}
 	//endregion Data Members
 
 	//region Constructors
@@ -74,6 +103,13 @@ public class Client implements WebSocket.Listener {
 		} catch (Exception e) {
 			Client.Log("Initialization Failure. " + e.getMessage());
 		}
+	}
+
+	Client(Config config, WebSocketConnector webSocketConnector, long[] selfHealBackoffs, long connectTimeoutMillis) {
+		this(config);
+		this.webSocketConnector = webSocketConnector;
+		this.selfHealBackoffs = Arrays.copyOf(selfHealBackoffs, selfHealBackoffs.length);
+		this.connectTimeoutMillis = connectTimeoutMillis;
 	}
 
 	public Client(OnTrade onTrade){
@@ -105,13 +141,13 @@ public class Client implements WebSocket.Listener {
 
 	//region Public Get Set
 	public String getStats() {
-		return String.format("Data Messages = %d, Text Messages = %d, Queue Depth = %d", this.dataMsgCount.get(), this.textMsgCount.get(), getDataSize());
+		return String.format("Data Messages = %d, Text Messages = %d, Queue Depth = %d, Local queue drop count = %d", this.dataMsgCount.get(), this.textMsgCount.get(), getDataSize(), data.getDroppedCount());
 	}
 	//endregion Public Get Set
 
 	//region Private Get Set
 	private int getDataSize() {
-		return dataBucket.size();
+		return data.size();
 	}
 
 	private String getAuthUrl() throws Exception {
@@ -171,71 +207,59 @@ public class Client implements WebSocket.Listener {
 
 	//region Public Methods
 	public CompletionStage<Void> onClose(WebSocket ws, int status, String reason) {
-		wsLock.writeLock().lock();
-		try {
-			try {
-				this.wsState.getWebSocket().sendClose(1000, "Client closed");
-			}catch (Exception ex){}
-
-			if (!wsState.isReconnecting()) {
-				Client.Log("Websocket - Closed");
-				wsState.setReady(false);
-				if (!isCancellationRequested){
-					this.wsState.setReconnecting(true);
-					try {
-						new Thread(() -> {
-							try { Thread.sleep(1000); } catch (Exception e){}
-							this.doWithRetryBackoff(() -> reconnect());
-						}).start();
-					}catch (Exception e){}
-				}
-			}
-		} finally {
-			wsLock.writeLock().unlock();
+		if (!noteFailedWebSocket(ws)) {
+			return CompletableFuture.completedFuture(null);
 		}
-		return null;
+		Client.Log("Websocket - Closed%s", reason == null || reason.isBlank() ? "" : ". " + reason);
+		startReconnectWorker();
+		return CompletableFuture.completedFuture(null);
 	}
 
 	public void onError(WebSocket ws, Throwable err) {
-		try {
-			Client.Log("Websocket - Error - %s", err.getMessage());
-			ws.request(1);
-			if (err.getMessage() == "Operation timed out"){
-				onClose(ws, 1000, "Websocket - Error");
-			}
-		}
-		catch (Exception e){
-			Client.Log("Websocket - Error - %s", e.getMessage());
-		}
+		Client.Log("Websocket - Error - %s", err == null ? "Unknown error" : err.getMessage());
+		if (!noteFailedWebSocket(ws)) return;
+		abortWebSocket(ws);
+		startReconnectWorker();
 	}
 
 	public CompletionStage<Void> onText(WebSocket ws, CharSequence data, boolean isComplete) {
+		if (!isCurrentWebSocket(ws)) {
+			return CompletableFuture.completedFuture(null);
+		}
 		textMsgCount.addAndGet(1l);
 		if (data != null && data.length() > 0) {
 			try {
 				Client.Log("Error received: %s", data.toString());
-				ws.request(1);
 			}
 			catch (Exception e) {
 				Client.Log("Failure parsing error from server in onText(). " + e.getMessage());
-				ws.request(1);
 			}
 		}
-		else
+		try {
 			ws.request(1);
-		return null;
+		} catch (Exception e) {
+			onError(ws, e);
+		}
+		return CompletableFuture.completedFuture(null);
 	}
 
 	public CompletionStage<Void> onBinary(WebSocket ws, ByteBuffer data, boolean isComplete) {
+		if (!isCurrentWebSocket(ws)) {
+			return CompletableFuture.completedFuture(null);
+		}
 		dataMsgCount.addAndGet(1);
 		byte[] bytes = new byte[data.remaining()];
 		data.get(bytes);
 		this.dataBucket.add(new Tuple<byte[], Boolean>(bytes, isComplete));
 		if (isComplete) {
-			this.data.add(assembleCompleteDataMessage());
+			enqueueCompleteDataMessage(assembleCompleteDataMessage());
 		}
-		ws.request(1);
-		return null;
+		try {
+			ws.request(1);
+		} catch (Exception e) {
+			onError(ws, e);
+		}
+		return CompletableFuture.completedFuture(null);
 	}
 
 	public static void Log(String message) {
@@ -248,29 +272,21 @@ public class Client implements WebSocket.Listener {
 
 	public void join() {
 		while (!this.allReady()) {
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {}
+			if (!waitForReady()) return;
 		}
 		String[] symbols = config.getEquitiesSymbols();
 		boolean tradesOnly = config.isEquitiesTradesOnly();
 		for (String symbol : symbols) {
-			if (!this.channels.contains(new Channel(symbol, tradesOnly))) {
-				this._join(symbol, tradesOnly);
-			}
+			this._join(symbol, tradesOnly);
 		}
 	}
 
 	public void join(String symbol, boolean tradesOnly) {
 		boolean t = tradesOnly || config.isEquitiesTradesOnly();
 		while (!this.allReady()) {
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {}
+			if (!waitForReady()) return;
 		}
-		if (!this.channels.contains(new Channel(symbol, tradesOnly))) {
-			this._join(symbol, t);
-		}
+		this._join(symbol, t);
 	}
 
 	public void join(String symbol) {
@@ -280,14 +296,10 @@ public class Client implements WebSocket.Listener {
 	public void join(String[] symbols, boolean tradesOnly) {
 		boolean t = tradesOnly || config.isEquitiesTradesOnly();
 		while (!this.allReady()) {
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {}
+			if (!waitForReady()) return;
 		}
 		for (String symbol : symbols) {
-			if (!this.channels.contains(new Channel(symbol, t))) {
-				this._join(symbol, t);
-			}
+			this._join(symbol, t);
 		}
 	}
 
@@ -302,32 +314,28 @@ public class Client implements WebSocket.Listener {
 	public void joinLobby(boolean tradesOnly){
 		boolean t = tradesOnly || config.isEquitiesTradesOnly();
 		while (!this.allReady()) {
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {}
+			if (!waitForReady()) return;
 		}
-		if (!this.channels.contains(new Channel(FirehoseChannelName, tradesOnly))) {
-			this._join(FirehoseChannelName, t);
-		}
+		this._join(FirehoseChannelName, t);
 	}
 
 	public void leave() {
-		for (Channel channel : this.channels) {
+		for (Channel channel : snapshotChannels()) {
 			this._leave(channel.symbol(), channel.tradesOnly());
 		}
 	}
 
 	public void leave(String symbol) {
-		for (Channel channel : this.channels) {
-			if (channel.symbol() == symbol) {
+		for (Channel channel : snapshotChannels()) {
+			if (channel.symbol().equals(symbol)) {
 				this._leave(symbol, channel.tradesOnly());
 			}
 		}
 	}
 
 	public void leaveLobby(){
-		for (Channel channel : this.channels) {
-			if (channel.symbol() == FirehoseChannelName) {
+		for (Channel channel : snapshotChannels()) {
+			if (channel.symbol().equals(FirehoseChannelName)) {
 				this._leave(FirehoseChannelName, channel.tradesOnly());
 			}
 		}
@@ -335,8 +343,8 @@ public class Client implements WebSocket.Listener {
 
 	public void leave(String[] symbols) {
 		for (String symbol : symbols) {
-			for (Channel channel : this.channels) {
-				if (channel.symbol() == symbol) {
+			for (Channel channel : snapshotChannels()) {
+				if (channel.symbol().equals(symbol)) {
 					this._leave(symbol, channel.tradesOnly());
 				}
 			}
@@ -344,26 +352,93 @@ public class Client implements WebSocket.Listener {
 	}
 
 	public void start() throws Exception{
-		String token = this.fetchToken();
-		this.initializeWebSocket(token);
-		this.startThreads();
+		long generation;
+		synchronized (lifecycleLock) {
+			while (lifecycle == Lifecycle.STOPPING) {
+				lifecycleLock.wait();
+			}
+			if (lifecycle == Lifecycle.STARTED) return;
+			if (lifecycle == Lifecycle.STARTING) {
+				while (lifecycle == Lifecycle.STARTING) lifecycleLock.wait();
+				if (lifecycle == Lifecycle.STARTED) return;
+			}
+			lifecycle = Lifecycle.STARTING;
+			isCancellationRequested = false;
+			generation = connectionGeneration.incrementAndGet();
+			clearSessionData();
+			startThreads();
+			connectingThread = Thread.currentThread();
+		}
+
+		boolean connected = false;
+		try {
+			connectWithRetry(generation);
+			connected = isGenerationActive(generation) && allReady();
+			if (!connected) throw new InterruptedException("Client start was cancelled");
+			synchronized (lifecycleLock) {
+				if (lifecycle == Lifecycle.STARTING) lifecycle = Lifecycle.STARTED;
+				lifecycleLock.notifyAll();
+			}
+		} finally {
+			connectingThread = null;
+			if (!connected) {
+				synchronized (lifecycleLock) {
+					if (lifecycle == Lifecycle.STARTING) {
+						lifecycle = Lifecycle.STOPPED;
+						isCancellationRequested = true;
+						connectionGeneration.incrementAndGet();
+					}
+					lifecycleLock.notifyAll();
+				}
+				stopThreads();
+			}
+		}
 	}
 
 	public void stop() {
-		this.leave();
-		try {
-			Thread.sleep(1000);
-		} catch (Exception e) {}
+		synchronized (lifecycleLock) {
+			if (lifecycle == Lifecycle.STOPPED) return;
+			if (lifecycle == Lifecycle.STOPPING) {
+				while (lifecycle == Lifecycle.STOPPING) {
+					try { lifecycleLock.wait(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
+				}
+				return;
+			}
+			lifecycle = Lifecycle.STOPPING;
+			isCancellationRequested = true;
+			connectionGeneration.incrementAndGet();
+		}
+
+		CompletableFuture<WebSocket> pendingConnect = connectFuture;
+		if (pendingConnect != null) pendingConnect.cancel(true);
+		HttpURLConnection pendingAuth = activeAuthConnection;
+		if (pendingAuth != null) pendingAuth.disconnect();
+		Thread pendingConnectingThread = connectingThread;
+		if (pendingConnectingThread != null && pendingConnectingThread != Thread.currentThread()) pendingConnectingThread.interrupt();
+		Thread pendingReconnectThread = reconnectThread;
+		if (pendingReconnectThread != null && pendingReconnectThread != Thread.currentThread()) pendingReconnectThread.interrupt();
+
+		WebSocket ws;
 		wsLock.writeLock().lock();
 		try {
 			wsState.setReady(false);
-		} catch (Exception e) {}
-		finally {
+			wsState.setReconnecting(false);
+			ws = wsState.getWebSocket();
+		} finally {
 			wsLock.writeLock().unlock();
 		}
 		Client.Log("Websocket - Closing");
-		stopThreads(); //this sets isCancellationRequested = true so the following close event doesn't try to reconnect
-		onClose(this.wsState.getWebSocket(), 1000, "Websocket - Error");
+		closeWebSocket(ws);
+		joinThread(pendingConnectingThread);
+		joinThread(pendingReconnectThread);
+		stopThreads();
+		clearSessionData();
+		failedWebSockets.clear();
+		reconnectWorkerRunning.set(false);
+		synchronized (lifecycleLock) {
+			lifecycle = Lifecycle.STOPPED;
+			lifecycleLock.notifyAll();
+		}
 		Client.Log("Stopped");
 	}
 	//endregion Public Methods
@@ -371,50 +446,34 @@ public class Client implements WebSocket.Listener {
 	//region Private Methods
 	private void processData(){
 		while (!this.isCancellationRequested) {
-			int count, offset, messageLength;
-			byte type;
-			ByteBuffer buffer, offsetBuffer;
 			try {
-				byte[] datum = data.poll(1, TimeUnit.SECONDS);
-				if (datum != null) {
-					count = datum[0];
-					offset = 1;
-					buffer = ByteBuffer.wrap(datum);
-					buffer.position(0);
-					buffer.limit(datum.length);
-					for (long i = 0L; i < count; i++) {
-						buffer.position(0);
-						type = datum[offset];
-						messageLength = datum[offset + 1];
-						offsetBuffer = buffer.slice(offset, messageLength);
-						switch (type) {
-							case 0:
-								Trade trade = Trade.parse(offsetBuffer);
-								onTrade.onTrade(trade);
-								break;
-							case 1:
-							case 2:
-								Quote quote = Quote.parse(offsetBuffer);
-								onQuote.onQuote(quote);
-								break;
-							default:
-								Client.Log("Error parsing multi-part message. Type is %d", type);
-								i = count;
-						}
-						offset += messageLength;
-					}
+				byte[] message = data.take();
+				ByteBuffer buffer = ByteBuffer.wrap(message);
+				switch (message[0]) {
+					case 0:
+						onTrade.onTrade(Trade.parse(buffer));
+						break;
+					case 1:
+					case 2:
+						onQuote.onQuote(Quote.parse(buffer));
+						break;
+					default:
+						Client.Log("Error parsing message. Type is %d", message[0]);
 				}
-			} catch (Exception ex)
-			{
-				Client.Log("General Exception");
+			} catch (InterruptedException ex) {
+				Thread.currentThread().interrupt();
+				return;
+			} catch (Exception ex) {
+				Client.Log("General Exception: %s", ex.getMessage());
 			}
 		}
 	}
 
-	private void startThreads() throws Exception{
+	private void startThreads() {
 		this.isCancellationRequested = false;
 		for (int i = 0; i < processDataThreads.length; i++) {
-			processDataThreads[i] = new Thread(()->processData());
+			processDataThreads[i] = new Thread(this::processData, "intrinio-equities-worker-" + i);
+			processDataThreads[i].setDaemon(true);
 		}
 		for (Thread thread : processDataThreads) {
 			thread.start();
@@ -423,13 +482,11 @@ public class Client implements WebSocket.Listener {
 
 	private void stopThreads(){
 		this.isCancellationRequested = true;
-		try {
-			Thread.sleep(1000);
-		}catch (Exception e){}
 		for (Thread thread : processDataThreads) {
-			try {
-				thread.join();
-			}catch (Exception e){}
+			if (thread != null) thread.interrupt();
+		}
+		for (Thread thread : processDataThreads) {
+			joinThread(thread);
 		}
 	}
 
@@ -439,99 +496,130 @@ public class Client implements WebSocket.Listener {
 
 	private void _join(String symbol, boolean tradesOnly, boolean forceRejoin){
 		Channel channel = new Channel(symbol, tradesOnly);
-		if (channels.add(channel) || (channels.contains(channel) && forceRejoin)) {
+		boolean shouldSend;
+		synchronized (channelsLock) {
+			shouldSend = channels.add(channel) || (channels.contains(channel) && forceRejoin);
+		}
+		if (shouldSend) {
 			byte[] message = makeJoinMessage(tradesOnly, symbol);
 			Client.Log("Websocket - Joining channel: %s (trades only = %s)", symbol, Boolean.toString(tradesOnly));
-			wsState.getWebSocket().sendBinary(ByteBuffer.wrap(message), true);
+			try {
+				sendBinary(getCurrentWebSocket(), message);
+			} catch (Exception e) {
+				Client.Log("Websocket - Warning while joining channel: %s", e.getMessage());
+				markDisconnectedAndReconnect(getCurrentWebSocket());
+			}
 		}
 	}
 
 	private void _leave(String symbol, boolean tradesOnly) {
 		Channel channel = new Channel(symbol, tradesOnly);
-		if (channels.remove(channel)) {
+		boolean removed;
+		synchronized (channelsLock) {
+			removed = channels.remove(channel);
+		}
+		if (removed) {
 			byte[] message = makeLeaveMessage(symbol);
 			Client.Log("Websocket - Leaving channel: %s (trades only = %s)", symbol, Boolean.toString(tradesOnly));
-			wsState.getWebSocket().sendBinary(ByteBuffer.wrap(message), true);
-		}
-	}
-
-	private void onWebSocketConnected (WebSocket ws, WebSocketState wsState) {
-		for (Channel channel : channels) {
-			_join(channel.symbol(), channel.tradesOnly(), true);
-		}
-	}
-
-	private void initializeWebSocket(String token) {
-		wsLock.writeLock().lock();
-		try {
-			Client.Log("Websocket - Connecting...");
-			WebSocketState wsState = new WebSocketState();
-			String wsUrl;
 			try {
-				wsUrl = this.getWebSocketUrl(token);
+				sendBinary(getCurrentWebSocket(), message);
 			} catch (Exception e) {
-				Client.Log("Initialization Failure. " + e.getMessage());
-				return;
+				Client.Log("Websocket - Warning while leaving channel: %s", e.getMessage());
 			}
-			URI uri = null;
-			try {
-				uri = new URI(wsUrl);
-			} catch (URISyntaxException e) {
-				Client.Log("Initialization Failure. Bad URL (%s). %s", wsUrl, e.getMessage());
-				return;
-			}
-			HttpClient httpClient = HttpClient.newHttpClient();
-			CompletableFuture<WebSocket> task =
-				httpClient.newWebSocketBuilder()
-				.header(HeaderMessageVersionKey, HeaderMessageVersionValue)
-				.header(HeaderClientInformationKey, HeaderClientInformationValue)
-				.buildAsync(uri, (WebSocket.Listener) this);
-			try {
-				WebSocket ws = task.get();
-				this.wsState.setWebSocket(ws);
-				Client.Log("Websocket - Connected");
-				this.onWebSocketConnected(ws, this.wsState);
-			} catch (ExecutionException e) {
-				Client.Log("Initialization Failure. Could not establish connection. %s", e.getMessage());
-			} catch (InterruptedException e) {
-				Client.Log("Initialization Failure. Thread interrupted. %s", e.getMessage());
-			}
-		} finally {
-			wsLock.writeLock().unlock();
 		}
 	}
 
-	private boolean reconnect(){
-		Client.Log("Websocket - Reconnecting...");
-		if (this.wsState.isReady()) {
-			return true;
-		} else {
-			this.wsLock.writeLock().lock();
-			try {
-				this.wsState.setReconnecting(true);
-			} finally {
-				this.wsLock.writeLock().unlock();
-			}
-			String token = this.fetchToken();
-			initializeWebSocket(token);
-			return false;
+	private void onWebSocketConnected(WebSocket ws) throws Exception {
+		for (Channel channel : snapshotChannels()) {
+			Client.Log("Websocket - Rejoining channel: %s (trades only = %s)", channel.symbol(), Boolean.toString(channel.tradesOnly()));
+			sendBinary(ws, makeJoinMessage(channel.tradesOnly(), channel.symbol()));
 		}
 	}
 
-	private String fetchToken() {
-		tLock.readLock().lock();
+	private CompletableFuture<WebSocket> openWebSocket(URI uri, WebSocket.Listener listener) {
+		HttpClient httpClient = HttpClient.newBuilder()
+			.connectTimeout(Duration.ofMillis(connectTimeoutMillis))
+			.build();
+		return httpClient.newWebSocketBuilder()
+			.header(HeaderMessageVersionKey, HeaderMessageVersionValue)
+			.header(HeaderClientInformationKey, HeaderClientInformationValue)
+			.buildAsync(uri, listener);
+	}
+
+	private void connectWithRetry(long generation) throws Exception {
+		int backoffIndex = 0;
+		while (isGenerationActive(generation)) {
+			try {
+				Client.Log("Websocket - Reconnecting...");
+				if (tryGetNewToken() && connectOnce(token.get().token(), generation)) return;
+			} catch (InterruptedException | CancellationException e) {
+				throw e;
+			} catch (Exception e) {
+				Client.Log("Websocket - Connection attempt failed: %s", rootMessage(e));
+			}
+			if (!isGenerationActive(generation)) break;
+			long backoff = selfHealBackoffs[Math.min(backoffIndex, selfHealBackoffs.length - 1)];
+			backoffIndex = Math.min(backoffIndex + 1, selfHealBackoffs.length - 1);
+			Thread.sleep(backoff);
+		}
+		throw new InterruptedException("Connection attempt cancelled");
+	}
+
+	private boolean connectOnce(String authToken, long generation) throws Exception {
+		URI uri = new URI(getWebSocketUrl(authToken));
+		Client.Log("Websocket - Connecting...");
+		CompletableFuture<WebSocket> task = webSocketConnector.connect(uri, this);
+		connectFuture = task;
+		task.whenComplete((created, error) -> {
+			if (created != null && !isGenerationActive(generation)) abortWebSocket(created);
+		});
+		WebSocket created = null;
 		try {
-			tLock.readLock().unlock();
-			tLock.writeLock().lock();
+			created = task.orTimeout(connectTimeoutMillis, TimeUnit.MILLISECONDS).get();
+			if (!isGenerationActive(generation)) throw new CancellationException("Connection cancelled");
+
+			WebSocket previous;
+			wsLock.writeLock().lock();
 			try {
-				doWithRetryBackoff(() -> tryGetNewToken());
-				tLock.readLock().lock();
-				return this.token.get().token();
+				if (!isGenerationActive(generation)) throw new CancellationException("Connection cancelled");
+				previous = wsState.getWebSocket();
+				wsState.setWebSocket(created);
+				wsState.setReady(false);
+				wsState.setReconnecting(true);
+				if (previous != null && previous != created) failedWebSockets.remove(previous);
 			} finally {
-				tLock.writeLock().unlock();
+				wsLock.writeLock().unlock();
 			}
+			if (previous != null && previous != created) abortWebSocket(previous);
+
+			onWebSocketConnected(created);
+			if (failedWebSockets.contains(created) || created.isInputClosed() || created.isOutputClosed()) {
+				throw new IOException("Websocket closed during connection setup");
+			}
+
+			wsLock.writeLock().lock();
+			try {
+				if (!isGenerationActive(generation) || wsState.getWebSocket() != created || failedWebSockets.contains(created)) {
+					throw new CancellationException("Connection was superseded");
+				}
+				wsState.setReady(true);
+				wsState.setReconnecting(false);
+			} finally {
+				wsLock.writeLock().unlock();
+			}
+			Client.Log("Websocket - Connected");
+			return true;
+		} catch (ExecutionException e) {
+			Throwable cause = e.getCause();
+			if (cause instanceof TimeoutException) throw new TimeoutException("Websocket connect timed out after " + connectTimeoutMillis + "ms");
+			if (cause instanceof Exception) throw (Exception) cause;
+			throw e;
 		} finally {
-			tLock.readLock().unlock();
+			if (connectFuture == task) connectFuture = null;
+			if (created != null && (!allReady() || !isCurrentWebSocket(created))) {
+				abortWebSocket(created);
+				failedWebSockets.remove(created);
+			}
 		}
 	}
 
@@ -554,7 +642,10 @@ public class Client implements WebSocket.Listener {
 		HttpURLConnection con;
 		try {
 			con = (HttpURLConnection) url.openConnection();
+			con.setConnectTimeout((int)Math.min(connectTimeoutMillis, Integer.MAX_VALUE));
+			con.setReadTimeout((int)Math.min(connectTimeoutMillis, Integer.MAX_VALUE));
 			con.setRequestProperty(HeaderClientInformationKey, HeaderClientInformationValue);
+			activeAuthConnection = con;
 		} catch (IOException e) {
 			Client.Log("Authorization Failure. Please check your network connection. " + e.getMessage());
 			return false;
@@ -563,9 +654,11 @@ public class Client implements WebSocket.Listener {
 			con.setRequestMethod("GET");
 			int status = con.getResponseCode();
 			if (status == 200) {
-				BufferedReader reader = new BufferedReader(new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8));
-				String token = reader.readLine();
-				this.token.set(new Token(token, LocalDateTime.now()));
+				String newToken;
+				try (BufferedReader reader = new BufferedReader(new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8))) {
+					newToken = reader.readLine();
+				}
+				this.token.set(new Token(newToken, LocalDateTime.now()));
 				Client.Log("Authorization successful");
 				return true;
 			}
@@ -581,7 +674,175 @@ public class Client implements WebSocket.Listener {
 		} catch (Exception e) {
 			Client.Log("Authorization Failure. " + e.getMessage());
 			return false;
+		} finally {
+			if (activeAuthConnection == con) activeAuthConnection = null;
+			con.disconnect();
 		}
+	}
+
+	private void enqueueCompleteDataMessage(byte[] datum) {
+		if (datum.length == 0) return;
+		int count = Byte.toUnsignedInt(datum[0]);
+		int offset = 1;
+		for (int i = 0; i < count; i++) {
+			if (offset + 1 >= datum.length) {
+				Client.Log("Error parsing multi-part message: incomplete header");
+				return;
+			}
+			int type = Byte.toUnsignedInt(datum[offset]);
+			int messageLength = Byte.toUnsignedInt(datum[offset + 1]);
+			if (messageLength < 2 || offset + messageLength > datum.length) {
+				Client.Log("Error parsing multi-part message: invalid length %d", messageLength);
+				return;
+			}
+			byte[] message = Arrays.copyOfRange(datum, offset, offset + messageLength);
+			if (type == 0) {
+				data.offer(0, message);
+			} else if (type == 1 || type == 2) {
+				data.offer(1, message);
+			} else {
+				Client.Log("Error parsing multi-part message. Type is %d", type);
+				return;
+			}
+			offset += messageLength;
+		}
+	}
+
+	private void startReconnectWorker() {
+		synchronized (lifecycleLock) {
+			if (lifecycle != Lifecycle.STARTED || isCancellationRequested || allReady()) return;
+		}
+		if (!reconnectWorkerRunning.compareAndSet(false, true)) return;
+		long generation = connectionGeneration.get();
+		Thread worker = new Thread(() -> {
+			try {
+				connectWithRetry(generation);
+			} catch (InterruptedException | CancellationException ignored) {
+				Thread.currentThread().interrupt();
+			} catch (Exception e) {
+				Client.Log("Websocket - Reconnect worker failed: %s", rootMessage(e));
+			} finally {
+				reconnectWorkerRunning.set(false);
+				if (isGenerationActive(generation) && !allReady()) startReconnectWorker();
+			}
+		}, "intrinio-equities-reconnect");
+		worker.setDaemon(true);
+		reconnectThread = worker;
+		worker.start();
+	}
+
+	private void markDisconnectedAndReconnect(WebSocket ws) {
+		if (!noteFailedWebSocket(ws)) return;
+		abortWebSocket(ws);
+		startReconnectWorker();
+	}
+
+	private boolean noteFailedWebSocket(WebSocket ws) {
+		wsLock.writeLock().lock();
+		try {
+			if (ws == null || wsState.getWebSocket() != ws) return false;
+			failedWebSockets.add(ws);
+			failedWebSockets.removeIf(existing -> existing != ws);
+			wsState.setReady(false);
+			wsState.setReconnecting(!isCancellationRequested);
+			return true;
+		} finally {
+			wsLock.writeLock().unlock();
+		}
+	}
+
+	private boolean isCurrentWebSocket(WebSocket ws) {
+		wsLock.readLock().lock();
+		try {
+			return ws != null && wsState.getWebSocket() == ws;
+		} finally {
+			wsLock.readLock().unlock();
+		}
+	}
+
+	private WebSocket getCurrentWebSocket() {
+		wsLock.readLock().lock();
+		try {
+			return wsState.getWebSocket();
+		} finally {
+			wsLock.readLock().unlock();
+		}
+	}
+
+	private void sendBinary(WebSocket ws, byte[] message) throws Exception {
+		if (ws == null) throw new IOException("Websocket is not connected");
+		try {
+			ws.sendBinary(ByteBuffer.wrap(message), true)
+				.orTimeout(connectTimeoutMillis, TimeUnit.MILLISECONDS)
+				.get();
+		} catch (ExecutionException e) {
+			Throwable cause = e.getCause();
+			if (cause instanceof Exception) throw (Exception) cause;
+			throw e;
+		}
+	}
+
+	private boolean waitForReady() {
+		if (isCancellationRequested) return false;
+		try {
+			Thread.sleep(20L);
+			return !isCancellationRequested;
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return false;
+		}
+	}
+
+	private Channel[] snapshotChannels() {
+		synchronized (channelsLock) {
+			return channels.toArray(new Channel[0]);
+		}
+	}
+
+	private void clearSessionData() {
+		data.clear();
+		dataBucketLock.lock();
+		try {
+			dataBucket.clear();
+		} finally {
+			dataBucketLock.unlock();
+		}
+	}
+
+	private boolean isGenerationActive(long generation) {
+		return !isCancellationRequested && connectionGeneration.get() == generation;
+	}
+
+	private void closeWebSocket(WebSocket ws) {
+		if (ws == null) return;
+		try {
+			ws.sendClose(WebSocket.NORMAL_CLOSURE, "Client requested close")
+				.orTimeout(CloseTimeoutMillis, TimeUnit.MILLISECONDS)
+				.get();
+		} catch (Exception e) {
+			abortWebSocket(ws);
+		}
+	}
+
+	private void abortWebSocket(WebSocket ws) {
+		if (ws == null) return;
+		try { ws.abort(); } catch (Exception ignored) {}
+	}
+
+	private void joinThread(Thread thread) {
+		if (thread == null || thread == Thread.currentThread()) return;
+		try {
+			thread.join(ThreadJoinTimeoutMillis);
+			if (thread.isAlive()) Client.Log("Thread timed out while stopping: %s", thread.getName());
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+	}
+
+	private static String rootMessage(Throwable throwable) {
+		Throwable current = throwable;
+		while (current.getCause() != null) current = current.getCause();
+		return current.getMessage() == null ? current.getClass().getSimpleName() : current.getMessage();
 	}
 
 	private byte[] makeJoinMessage(boolean tradesOnly, String symbol) {
@@ -650,22 +911,6 @@ public class Client implements WebSocket.Listener {
 		return bytes;
 	}
 
-	private void doWithRetryBackoff(BooleanSupplier callback) {
-		int i = 0;
-		long backoff = this.selfHealBackoffs[i];
-		boolean success = callback.getAsBoolean();
-		while (!success) {
-			try {
-				Thread.sleep(backoff);
-				i = Math.min(i + 1, this.selfHealBackoffs.length - 1);
-				backoff = this.selfHealBackoffs[i];
-				success = callback.getAsBoolean();
-			} catch (InterruptedException e) {}
-			catch (Exception e) {
-				//Client.Log("Error.  Retrying...");
-			}
-		}
-	}
 	//endregion Private Methods
 
 	private class Tuple<X, Y> {
